@@ -46,6 +46,9 @@ export class Social {
   /** Çay fırlatma (Aşama 3) */
   readonly throwState = newThrowState();
   teaEnabled: () => boolean = () => true;
+  /** Oyun saati (Game verir) ve son çay içme anı (dart nişanı titrer) */
+  now: () => number = () => 0;
+  lastDrinkAt: number | null = null;
   private npcThrowCd = new Map<string, number>();
 
   constructor(
@@ -177,6 +180,7 @@ export class Social {
         if (!this.playerHasTea) { this.toast('Elinde çay yok. Semavere git ya da T ile Şükrü\'den iste.'); p.anim.play('shrug'); return; }
         p.anim.play('drink');
         sfx.play('glass');
+        this.lastDrinkAt = this.now();
         setTimeout(() => p.say(pickLine(['Oh be!', 'Tavşan kanı!', 'Mis gibi...']), 2), 1400);
         setTimeout(() => this.setPlayerTea(false), 2600);
         break;

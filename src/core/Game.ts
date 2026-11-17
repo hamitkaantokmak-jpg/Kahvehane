@@ -18,6 +18,8 @@ import { Social, EMOTES } from '../interactions/Social';
 import { sfx } from '../audio/Sfx';
 import { loadSettings, saveSettings, Settings, loadStats, saveStats, Stats } from '../save/Settings';
 import { TableSession } from '../tables/TableSession';
+import { DartSession } from '../tables/DartSession';
+import { HorseRaceTV } from '../world/HorseRaceTV';
 import { OcclusionFader } from '../player/OcclusionFader';
 import { ChaosDirector } from '../chaos/ChaosDirector';
 import { BrawlController } from '../npc/BrawlController';
@@ -52,9 +54,12 @@ export class Game {
   brawls!: BrawlController;
   private overflowCooldown = 0;
   economy!: EconomyController;
+  race!: HorseRaceTV;
   private teaseT = 20;
   private raiseT = 90;
-  session: TableSession | null = null;
+  session: TableSession | DartSession | null = null;
+  /** Oyun saati (sn) */
+  clockTime = 0;
   private clock = new THREE.Clock();
   private frustum = new THREE.Frustum();
   private projScreen = new THREE.Matrix4();
@@ -142,6 +147,8 @@ export class Game {
     // ekonomi (Aşama 2)
     this.economy = new EconomyController(new LocalEconomyStore(), this.npcs.map((n) => n.id));
     this.social.economy = this.economy;
+    this.race = new HorseRaceTV(this);
+    this.social.now = () => this.clockTime;
     // çay fırlatma (Aşama 3)
     this.social.teaEnabled = () => this.settings.teaThrow !== 'off';
     this.world.npcThrowTea = (npc, target) => this.social.npcThrowTea(npc, target);
@@ -226,6 +233,7 @@ export class Game {
 
   private tick() {
     const dt = Math.min(0.05, this.clock.getDelta()) * this.timeScale;
+    this.clockTime += dt;
     this.frame++;
     this.fpsFrames++;
     this.fpsTime += dt;
@@ -253,6 +261,7 @@ export class Game {
       this.updateChaos(dt);
       this.updateEconomy(dt);
       this.updateTea(dt);
+      this.race.update(dt);
       this.effects.update(dt);
     }
     const look = this.input.consumeLook();
@@ -405,9 +414,10 @@ export class Game {
   private focusLabel(it: Interactable): string {
     switch (it.kind) {
       case 'seat': return `Otur — ${(it.ref as Seat).table.name}`;
-      case 'tv': return 'Kanalı değiştir';
+      case 'tv': return this.race.phase === 'betting' ? (this.race.playerBet ? 'Bahsin yapıldı — yarışı bekle 🐎' : 'At yarışına bahis yap 🐎') : 'Kanalı değiştir';
       case 'semaver': return this.economy.broke ? `Bulaşık yıka (+${WORK_PAY}🪙)` : `${this.social.playerHasTea ? 'Bir çay daha doldur' : 'Kendine çay doldur'} (${this.economy.price('tea')}🪙)`;
       case 'door': return 'Dışarı çık';
+      case 'dart': return 'Dart oyna 🎯';
       case 'npc': {
         const n = it.ref as NPC;
         if (n.id === 'sukru' && this.economy.debt > 0 && this.economy.balance > 0) return `Şükrü'ye borcunu öde (${this.economy.debt}🪙)`;
@@ -426,6 +436,8 @@ export class Game {
         this.sitDown(it.ref as Seat);
         break;
       case 'tv':
+        if (this.race.phase === 'betting') { if (!this.race.playerBet) this.race.openBetUI(); break; }
+        if (this.race.phase === 'running' || this.race.phase === 'results') { this.hud.toast('Yarış var, kanal değişmez!'); break; }
         this.kahve.tv.nextChannel();
         sfx.play('tvChannel');
         p.anim.play('point');
@@ -459,6 +471,9 @@ export class Game {
         setTimeout(() => { this.social.setPlayerTea(true); sfx.play('glass'); this.hud.toast(`Çayını doldurdun (${r.price}🪙${r.onCredit ? `, ${r.onCredit}🪙 veresiye` : ''}). 7 ile iç!`); this.stats.teas++; saveStats(this.stats); }, 1800);
         break;
       }
+      case 'dart':
+        this.startDart();
+        break;
       case 'door':
         p.say(pickLine(['Dışarısı soğuk, içerisi muhabbet. Kalayım.', 'Eve gidersem okey kaçar...', 'Bir el daha oynar, öyle giderim.']), 3);
         p.anim.play('shrug');
@@ -517,6 +532,17 @@ export class Game {
     const look = seat.table.center.clone().addScaledVector(back, -0.25).add(new THREE.Vector3(0, 0.3, 0));
     this.rig.setFixed(camPos, look);
     this.session = new TableSession(this, seat);
+  }
+
+  startDart() {
+    const p = this.player;
+    p.velocity.set(0, 0, 0);
+    this.mode = 'seated';
+    this.input.enabled = false;
+    this.input.releasePointer();
+    this.hud.setVisible(false);
+    this.hud.setPrompt(null);
+    this.session = new DartSession(this);
   }
 
   standUp() {

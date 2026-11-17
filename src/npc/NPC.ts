@@ -329,6 +329,15 @@ export class NPC {
     this.serveTarget = null;
   }
 
+  /** TV'yi izlemeye git (at yarışı vb.) — müsaitse */
+  goWatchTv() {
+    if (['idle', 'wander', 'chat', 'bench', 'seated', 'tv'].includes(this.mode) && !this.inBrawl) {
+      if (this.c.seated) this.c.standUp();
+      this.releaseReservations();
+      this.startActivity('watchTv');
+    }
+  }
+
   enterBrawl(role: 'fighter' | 'helper' | 'separator' | 'fleer') {
     this.requeueOrder();
     if (this.mode === 'inGame') this.awayFromGame = true;
