@@ -154,3 +154,15 @@ kayıtta ağırlıkları 0'dır, yani rastgele seçilmezler ama puan ve bekleme 
 - **İtiraz (masada 🙋):** bir bota "hile" iddiası; yalnızca replik + gerginlik (gerçek hile tespiti yok). 8 sn bekleme.
 - **Masa devirme:** çok sinirli biri (Rıza Dayı) okeyi kaybedip öfkelenirse masayı devirir, taşlar havalanır; **sonuç ve puanlar geçerli kalır**.
 - **Kibitz:** oyun sırasında boştaki bir NPC arkanda durup akıl verir ("O taşı atma!"). Menü → "Masada izleyici yorumları" ile kapatılabilir.
+
+## NPC mırıltısı (Aşama 6)
+Saf mantık `src/audio/voiceLogic.ts`, ses katmanı `src/audio/Voice.ts`.
+- Konuşma balonu çıkınca NPC'nin kendine özgü **prosedürel mırıltısı** çalar (Sims/Animal Crossing tarzı): her ünlü grubu bir hece,
+  ünlü türü metindeki Türkçe ünlülere göre (a/e/ı-i/o-ö/u-ü), soru cümlesinde ton sonda yükselir, ünlemde daha hızlı ve yüksek.
+- Her NPC'nin ayrı sesi var: Rıza kalın ve ağır, Nihat ince ve kıkırdak, Şükrü hızlı ve çok konuşan, Hasan uykulu ve yavaş,
+  Kemal resmi ve tekdüze, Cemal hızlı ve iddialı, Ferhat coşkulu.
+- **Konumsal ses:** PannerNode ile NPC'nin kafa konumundan; dinleyici kamera. Aynı anda **en yakın 3** kişi sesli konuşur, diğerleri yalnızca balon.
+- Konuşurken ağız ve baş hareket eder (sesi kısık olanlarda da).
+- Ayar: Menü → "NPC sesleri (mırıltı)".
+- **İleride gerçek ses kaydı:** çalma noktası soyutlanmıştır (`VoiceSource`). `voice.samples.register(npcId, metin, AudioBuffer)` ile
+  kaydedilen bir replik varsa o çalar; yoksa mırıltı. (Bu turda kayıt yok.)

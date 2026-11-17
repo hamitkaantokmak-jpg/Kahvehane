@@ -13,7 +13,11 @@ export class Bubbles implements BubbleHost {
     this.layer.className = 'bubble-layer';
     parent.appendChild(this.layer);
   }
+  /** Konuşma kancası (NPC sesi, ağız hareketi) */
+  onSay: ((c: Character, text: string, seconds: number) => void) | null = null;
+
   say(c: Character, text: string, seconds = 3) {
+    this.onSay?.(c, text, seconds);
     let b = this.items.find((x) => x.c === c);
     if (!b) {
       const el = document.createElement('div');

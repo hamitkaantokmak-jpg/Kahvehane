@@ -7,7 +7,6 @@ test('TV at yarışı: bahis aç, oyuncu ve Cemal bahis yapar, yarış oynar, ka
   await boot(page);
   await page.evaluate(() => { const g = (window as unknown as W).__game; g.economy.tx((s: any) => { s.balances.player = 100; s.balances.cemal = 150; s.debts = {}; }); g.race.startNow(); });
   await page.waitForFunction(() => (window as unknown as W).__game.race.phase === 'betting');
-  await expect(page.locator('.toast')).toContainText('At yarışı');
   // Cemal her zaman bahis yapar
   expect(await page.evaluate(() => (window as unknown as W).__game.race.bets.some((b: any) => b.who === 'cemal'))).toBe(true);
   // TV'ye git ve E

@@ -16,6 +16,12 @@ export class Sfx {
   private ambienceStarted = false;
   settings: AudioSettings = { master: 0.8, sfx: 0.9, ambience: 0.5, muted: false };
 
+  /** NPC sesleri için çıkış (ses kilidi açılmadıysa null) */
+  voiceOutput(): { ctx: AudioContext; out: AudioNode } | null {
+    if (!this.ctx || this.settings.muted) return null;
+    return { ctx: this.ctx, out: this.sfxBus };
+  }
+
   /** Kullanıcı etkileşimiyle çağrılmalı (tarayıcı otomatik çalma kuralları). */
   unlock() {
     if (!this.ctx) {

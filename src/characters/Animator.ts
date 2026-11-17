@@ -264,6 +264,10 @@ export class Animator {
   private lookPitch = 0;
   readonly pose: Pose = { ...ZERO_POSE };
   private idleVariant = 0;
+  private talkT = 0;
+  /** Konuşma animasyonu (yalnızca ağız/baş, kol jesti yok) */
+  speak(seconds: number) { this.talkT = Math.max(this.talkT, seconds); }
+  get talking() { return this.talkT > 0; }
   private idleVariantT = 4;
 
   constructor(model: CharacterModel) {
@@ -389,6 +393,12 @@ export class Animator {
     }
     this.actions = this.actions.filter((a) => !(a.stopping && a.weight <= 0) && (a.def.loop || a.t < a.def.duration));
 
+    // konuşma: ağız açılıp kapanır (mırıltıyla eşzamanlı)
+    if (this.talkT > 0) {
+      this.talkT -= dt;
+      out.mouth = Math.max(out.mouth, (Math.sin(this.time * 19) * 0.5 + 0.5) * (0.35 + Math.abs(Math.sin(this.time * 5.3)) * 0.35));
+      out.headX += Math.sin(this.time * 6) * 0.02;
+    }
     // göz kırpma
     this.blinkT -= dt;
     if (this.blinkT < 0) { this.blink = 0.14; this.blinkT = 2 + Math.random() * 4; }

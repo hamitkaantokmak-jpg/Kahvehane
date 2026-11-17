@@ -175,6 +175,7 @@ export class Hud {
             <option value="all" ${s.teaThrow === 'all' ? 'selected' : ''}>Herkes</option>
             <option value="off" ${s.teaThrow === 'off' ? 'selected' : ''}>Kapalı</option>
           </select></label>
+        <label class="row"><input type="checkbox" data-k="npcVoices" ${s.npcVoices ? 'checked' : ''}> NPC sesleri (mırıltı)</label>
         <label class="row"><input type="checkbox" data-k="kibitz" ${s.kibitz ? 'checked' : ''}> Masada izleyici yorumları (kibitz)</label>
         <label>Fare hassasiyeti <input type="range" min="0.3" max="2.5" step="0.1" data-k="sensitivity" value="${s.sensitivity}"></label>
         <label class="row"><input type="checkbox" data-k="invertY" ${s.invertY ? 'checked' : ''}> Kamerayı ters çevir (Y)</label>
