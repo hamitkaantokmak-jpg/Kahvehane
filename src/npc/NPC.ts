@@ -12,6 +12,7 @@ import type { NavGrid } from '../world/Collision';
 import type { Effects } from '../fx/Effects';
 import { sfx } from '../audio/Sfx';
 import type { TensionSource } from '../chaos/events';
+import { wipe } from '../interactions/teaThrow';
 
 export interface NpcWorld {
   kahve: Kahvehane;
@@ -360,6 +361,25 @@ export class NPC {
   }
   private retaliatePending = false;
 
+  /** Yüzüne çay fırlatıldı (leke Character.stain'de; burada sosyal tepki) */
+  onTeaSplashed(by: Character) {
+    const c = this.c;
+    this.anger = Math.min(1, this.anger + 0.25 + this.p.temper * 0.3);
+    this.w.onTension?.('teaSplash');
+    setTimeout(() => c.say(pickLine(this.p.lines.teaSplashed), 3), 450);
+    c.anim.play(this.p.temper > 0.6 ? 'angry' : 'shrug');
+    sfx.play(this.p.temper > 0.6 ? 'angry' : 'surprise', c.spec.voicePitch);
+    // bir süre sonra yüzünü siler (herkes değil)
+    if (Math.random() < 0.5) setTimeout(() => { c.anim.play('facepalm'); setTimeout(() => wipe(c.stain), 800); }, 9000 + Math.random() * 7000);
+    if (this.inBrawl) return;
+    const throwBack = this.p.temper >= 0.45 && Math.random() < 0.35 + this.p.temper * 0.5;
+    if (throwBack && this.w.npcThrowTea) {
+      setTimeout(() => { if (!this.inBrawl) this.w.npcThrowTea?.(this, by); }, 1400);
+      return;
+    }
+    if (by === this.w.player && this.mode !== 'inGame' && this.anger >= ANGER_BRAWL) this.w.requestBrawl?.(this.id, 'player');
+  }
+
   /** Oyuncu laf attığında */
   onLaf() {
     if (this.mode === 'inGame' || this.mode === 'react') return;
@@ -579,6 +599,8 @@ export interface NpcWorldHooks {
   onTension?: (source: TensionSource) => void;
   /** Kavga başlatma isteği; başladıysa true */
   requestBrawl?: (a: string, b: string) => boolean;
+  /** NPC'nin çay fırlatması (ayar kapalıysa false) */
+  npcThrowTea?: (npc: NPC, target: Character) => boolean;
 }
 
 /** Bu öfkenin üstünde ıstaka yiyen NPC kavga başlatır (Rıza ilk şaplakta, sakinler 2-3. şaplakta) */

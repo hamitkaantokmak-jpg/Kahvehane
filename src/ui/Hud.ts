@@ -34,9 +34,10 @@ export class Hud {
         <div class="tension-track"><div class="tension-fill" id="tensionFill"></div></div>
       </div>
       <div class="warn" id="warn"></div>
+      <div class="tea-overlay" id="teaOverlay"></div>
       <div class="help" id="help">
         <b>WASD</b> yürü · <b>Shift</b> koş · <b>Fare</b> kamera (tıkla/sürükle) · <b>E</b> etkileşim / otur<br/>
-        <b>F</b> ıstakayla şaplak · <b>Q</b> hareketler · <b>1-7</b> hızlı hareket · <b>T</b> çay iste · <b>Esc</b> menü
+        <b>F</b> ıstakayla şaplak · <b>G</b> çay fırlat · <b>Q</b> hareketler · <b>1-8</b> hızlı hareket · <b>T</b> çay iste · <b>Esc</b> menü
         <span class="help-close">✕</span>
       </div>
       <div class="prompt" id="prompt"></div>
@@ -45,6 +46,7 @@ export class Hud {
       <div class="mobile-btns" id="mobileBtns">
         <button data-a="emoteMenu" class="mb small">😀</button>
         <button data-a="tea" class="mb small">🍵</button>
+        <button data-a="throwTea" class="mb small" title="Çay fırlat">💦</button>
         <button data-a="bonk" class="mb">🏏<small>Istaka</small></button>
         <button data-a="interact" class="mb big">✋<small>Etkileşim</small></button>
       </div>
@@ -62,7 +64,7 @@ export class Hud {
     this.tensionEl = this.root.querySelector('#tension')!;
     this.warnEl = this.root.querySelector('#warn')!;
     this.root.querySelector('.help-close')!.addEventListener('click', () => (this.help.style.display = 'none'));
-    if (input.isTouch) { this.help.innerHTML = 'Sol: hareket (uzağa çek = koş) · Sağ: kamera · ✋ etkileşim · 🏏 ıstaka · 😀 hareketler <span class="help-close">✕</span>'; this.help.querySelector('.help-close')!.addEventListener('click', () => (this.help.style.display = 'none')); }
+    if (input.isTouch) { this.help.innerHTML = 'Sol: hareket (uzağa çek = koş) · Sağ: kamera · ✋ etkileşim · 🏏 ıstaka · 💦 çay fırlat · 😀 hareketler <span class="help-close">✕</span>'; this.help.querySelector('.help-close')!.addEventListener('click', () => (this.help.style.display = 'none')); }
     this.mobileBtns.style.display = input.isTouch ? 'flex' : 'none';
     this.mobileBtns.querySelectorAll('button').forEach((b) => {
       const fire = (e: Event) => { e.preventDefault(); e.stopPropagation(); input.trigger((b as HTMLButtonElement).dataset.a as never); };
@@ -77,6 +79,7 @@ export class Hud {
       this.emoteMenu.appendChild(b);
     }
     setTimeout(() => (this.help.style.opacity = '0.75'), 9000);
+    if (input.isTouch) setTimeout(() => (this.help.style.display = 'none'), 10000);
   }
 
   setVisible(v: boolean) {
@@ -91,6 +94,13 @@ export class Hud {
     this.tensionFill.style.width = `${r}%`;
     this.tensionEl.dataset.level = level;
     this.tensionLevel.textContent = { calm: 'Sakin', lively: 'Hareketli', tense: 'Gergin', explosive: 'Patlamak üzere' }[level];
+  }
+
+  /** Oyuncunun yüzü çaylıyken ekran kenarlarında damlalar */
+  setPlayerStain(k: number) {
+    const o = this.root.querySelector('#teaOverlay') as HTMLDivElement;
+    const v = Math.round(k * 20) / 20;
+    if (o.dataset.k !== String(v)) { o.dataset.k = String(v); o.style.opacity = String(v * 0.75); }
   }
 
   /** Kısa, yanıp sönen uyarı yazısı */
@@ -159,6 +169,11 @@ export class Hud {
             <option value="calm" ${s.chaosIntensity === 'calm' ? 'selected' : ''}>Sakin</option>
             <option value="normal" ${s.chaosIntensity === 'normal' ? 'selected' : ''}>Normal</option>
             <option value="chaos" ${s.chaosIntensity === 'chaos' ? 'selected' : ''}>Tam kaos</option>
+          </select></label>
+        <label>Çay fırlatma
+          <select data-k="teaThrow">
+            <option value="all" ${s.teaThrow === 'all' ? 'selected' : ''}>Herkes</option>
+            <option value="off" ${s.teaThrow === 'off' ? 'selected' : ''}>Kapalı</option>
           </select></label>
         <label>Fare hassasiyeti <input type="range" min="0.3" max="2.5" step="0.1" data-k="sensitivity" value="${s.sensitivity}"></label>
         <label class="row"><input type="checkbox" data-k="invertY" ${s.invertY ? 'checked' : ''}> Kamerayı ters çevir (Y)</label>

@@ -9,6 +9,8 @@ export interface Settings {
   invertY: boolean;
   /** Kaos yoğunluğu: Sakin / Normal / Tam kaos */
   chaosIntensity: 'calm' | 'normal' | 'chaos';
+  /** Çay fırlatma: herkes (oyuncu + NPC) / kapalı */
+  teaThrow: 'all' | 'off';
 }
 
 export interface Stats {
@@ -23,7 +25,7 @@ const STATS_KEY = 'kahvehane.stats.v1';
 
 export const DEFAULT_SETTINGS: Settings = {
   master: 0.8, sfx: 0.9, ambience: 0.5, muted: false,
-  quality: matchMediaSafe('(pointer: coarse)') ? 'low' : 'high', sensitivity: 1, invertY: false, chaosIntensity: 'normal',
+  quality: matchMediaSafe('(pointer: coarse)') ? 'low' : 'high', sensitivity: 1, invertY: false, chaosIntensity: 'normal', teaThrow: 'all',
 };
 
 function matchMediaSafe(q: string) {

@@ -25,6 +25,7 @@ import { createRng, Rng } from '../games/common/rng';
 import { EconomyController } from '../economy/EconomyController';
 import { LocalEconomyStore } from '../economy/store';
 import { WORK_PAY, dayNumber } from '../economy/Economy';
+import { stainIntensity, isStained } from '../interactions/teaThrow';
 
 export class Game {
   readonly renderer: THREE.WebGLRenderer;
@@ -141,6 +142,10 @@ export class Game {
     // ekonomi (Aşama 2)
     this.economy = new EconomyController(new LocalEconomyStore(), this.npcs.map((n) => n.id));
     this.social.economy = this.economy;
+    // çay fırlatma (Aşama 3)
+    this.social.teaEnabled = () => this.settings.teaThrow !== 'off';
+    this.world.npcThrowTea = (npc, target) => this.social.npcThrowTea(npc, target);
+    this.social.onPlayerSplashed = () => this.chaos.add('teaSplash');
     this.economy.onChange((bal, debt, delta) => this.hud.setMoney(bal, debt, delta));
     const now = new Date();
     const bonus = this.economy.claimDaily(dayNumber(now.getTime(), now.getTimezoneOffset()));
@@ -247,6 +252,7 @@ export class Game {
       this.kahve.update(dt);
       this.updateChaos(dt);
       this.updateEconomy(dt);
+      this.updateTea(dt);
       this.effects.update(dt);
     }
     const look = this.input.consumeLook();
@@ -256,6 +262,26 @@ export class Game {
     if (this.mode === 'explore') this.fader.update(this.camera.position, follow); else this.fader.update(null, follow);
     this.bubbles.update();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  private teaSeenT = 8;
+  private updateTea(dt: number) {
+    this.social.update(dt);
+    this.hud.setPlayerStain(stainIntensity(this.player.stain));
+    // çaylı yüzlü birini gören NPC laf atar
+    this.teaSeenT -= dt;
+    if (this.teaSeenT > 0) return;
+    this.teaSeenT = 7 + this.rng() * 6;
+    const stained = [this.player, ...this.npcs.map((n) => n.c)].filter((c) => isStained(c.stain));
+    for (const victim of stained) {
+      const watchers = this.npcs.filter((n) => n.c !== victim && !n.inBrawl && n.mode !== 'sleep' && n.c.pos.distanceTo(victim.pos) < 4.5);
+      const w = watchers[Math.floor(this.rng() * watchers.length)];
+      if (!w) continue;
+      w.c.anim.lookAt = victim.headWorld();
+      w.c.say(pickLine(w.p.lines.teaSeen), 2.8);
+      w.c.anim.play(w.p.temper < 0.5 ? 'laugh' : 'point');
+      break;
+    }
   }
 
   private updateEconomy(dt: number) {
@@ -322,6 +348,7 @@ export class Game {
       case 'interact': this.interact(); break;
       case 'bonk': if (this.social.bonk()) { this.stats.bonks++; saveStats(this.stats); } break;
       case 'tea': this.social.orderTea(); break;
+      case 'throwTea': this.social.throwTea(); break;
       case 'emoteMenu': this.hud.toggleEmotes(); break;
       default:
         if (a.startsWith('emote')) {

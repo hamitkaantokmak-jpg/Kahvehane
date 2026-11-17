@@ -11,9 +11,9 @@ npm run build    # tip kontrolü + üretim derlemesi
 
 ## Kontroller
 Masaüstü: WASD yürü · Shift koş · fare (tıkla = pointer lock / sürükle) kamera · tekerlek zoom · E etkileşim/otur ·
-F ıstakayla şaplak · Q hareket menüsü · 1-7 hızlı hareket (selam, kahkaha, alkış, göbek at, masaya vur, laf at, çay iç) ·
+F ıstakayla şaplak · G çay fırlat · Q hareket menüsü · 1-8 hızlı hareket (selam, kahkaha, alkış, göbek at, masaya vur, laf at, çay iç, yüzünü sil) ·
 T Şükrü'den çay iste · Esc menü / masadan kalk.
-Mobil: sol yarı sanal joystick (uzağa çekince koşar), sağ yarı kamera, ✋ etkileşim, 🏏 ıstaka, 😀 hareketler, 🍵 çay.
+Mobil: sol yarı sanal joystick (uzağa çekince koşar), sağ yarı kamera, ✋ etkileşim, 🏏 ıstaka, 💦 çay fırlat, 😀 hareketler, 🍵 çay.
 
 ## Mimari
 | Klasör | Görev |
@@ -102,3 +102,17 @@ Mantık `src/economy/` altında saftır; kalıcılık `EconomyStore` arayüzü a
   Tavla — her oyunda kaybeden öder (normal 1×, mars 2×, katmerli mars 3×) · Pişti — kaybeden takımın her üyesi öder, kazananlara bölünür.
   Oyuncunun parası yetmezse kalan alacaklıya veresiye yazılır; NPC'ler ellerindeki kadarını öder.
 - **HUD:** sağ üstte bakiye (🪙) ve veresiye (📒); değişince "+/−" animasyonu.
+
+## Çay fırlatma ve çaylı yüz (Aşama 3)
+Saf mantık: `src/interactions/teaThrow.ts` (ücret, bekleme, leke süresi). **Yalnızca görsel ve sosyaldir**: hiçbir oyun kuralına,
+taşa, karta ya da bota etkisi yoktur; masada oynarken de çalışır ("💦 Çay fırlat" düğmesi → hedef seç).
+
+- **Tuş:** G (mobil: 💦). Hedef önündeki en yakın kişidir; bardak yay çizerek uçar, isabette çay sıçrar, bardak kırılır.
+- **Ücret** (kahve parasından): kırık bardak 10🪙 + çay 5🪙 (elinde çay varsa çay bedeli alınmaz) + aynı hedefe 60 sn içinde
+  her yeni atışta +5🪙 (en fazla +20). Para yoksa veresiyeye yazılır; veresiye sınırı doluysa atılamaz. Atışlar arası 4 sn bekleme.
+- **Çaylı yüz:** isabet alanın yüzünde/saçında 22 sn çay lekesi ve süzülen damlalar; tekrar isabette süre uzar (en fazla 30 sn),
+  son 6 sn'de solarak kaybolur. Oyuncu 8 (ya da hareket menüsü → 🧻) ile yüzünü silebilir; NPC'ler bazen kendileri siler.
+  Oyuncunun yüzü çaylıyken ekran kenarlarında damlalar görünür.
+- **Tepkiler:** isabet gerginliğe +6 ekler; NPC kişiliğine göre söylenir, sinirliler kendi parasıyla çay fırlatarak karşılık verir,
+  öfkesi taşarsa kavga başlar. Çaylı yüzlü birini gören NPC'ler laf atar (`teaSplashed`, `teaSeen` replikleri).
+- **Ayar:** Menü → Çay fırlatma: Herkes / Kapalı (kapalıyken oyuncu da NPC'ler de fırlatamaz).

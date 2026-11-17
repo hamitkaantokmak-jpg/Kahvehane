@@ -41,6 +41,10 @@ export interface Personality {
     debtTease: string[];
     /** Bahsi artırmayı önerirken */
     betRaise: string[];
+    /** Yüzüne çay fırlatılınca */
+    teaSplashed: string[];
+    /** Çaylı yüzlü birini görünce */
+    teaSeen: string[];
   };
 }
 
@@ -71,6 +75,8 @@ export const PERSONALITIES: Record<string, Personality> = {
       brawlFlee: ['Belim tutulur, ben uzaktan bakarım!', 'Bu iş gençlerin işi!'],
       debtTease: ['Evlat, Şükrü\'ye borcun dağ oldu!', 'Benim zamanımda veresiye ayıptı!'],
       betRaise: ['Bu bahis az, bir çay daha koy!', 'Ustaya karşı bu kadar mı?'],
+      teaSplashed: ['Oğlum benim bıyığım çay oldu!', 'Bu çayı sen içecektin, ben değil!', 'Ömrümde böyle hakaret görmedim!'],
+      teaSeen: ['Hah! Yüzü demlik gibi olmuş!', 'Çayı içilir evladım, yüze sürülmez.'],
     },
   },
   cemal: {
@@ -99,6 +105,8 @@ export const PERSONALITIES: Record<string, Personality> = {
       brawlFlee: ['Bu kavgaya oran vermem, kaçıyorum!', 'Ceketim kirlenmesin!'],
       debtTease: ['Borçla bahis olmaz aslanım, önce hesabı kapat!', 'Bahse girerim bu borcu ödeyemezsin, şaka şaka!'],
       betRaise: ['Az bu! İkiye katlayalım mı?', 'Reis masasında bu bahis oynanmaz, artıralım!', 'İddiasına varım, bahsi büyütelim!'],
+      teaSplashed: ['Bahse girerim bu çay sıcaktı!', 'Gömleğim! İddiasına varım, ödeteceğim!'],
+      teaSeen: ['Bahse girerim o leke çıkmaz!', 'Çay maskesi mi bu? Moda olmuş!'],
     },
   },
   nihat: {
@@ -127,6 +135,8 @@ export const PERSONALITIES: Record<string, Personality> = {
       brawlFlee: ['Ben kartları toplayıp kaçıyorum!', 'Hah, ben yokum!'],
       debtTease: ['Hesap defterinde adın birinci sırada!', 'Şükrü seni bulaşığa koyacak, hıh hıh!'],
       betRaise: ['Biraz daha koyalım, heyecan olsun!', 'Pişti gibi bahis, ikiye katla!'],
+      teaSplashed: ['Hahaha, çay banyosu! Teşekkürler!', 'Ay, şeker koymamışsın!'],
+      teaSeen: ['Hıh hıh, yüzünde tavşan kanı var!', 'Tebrikler, çay pişti oldun!'],
     },
   },
   sukru: {
@@ -155,6 +165,8 @@ export const PERSONALITIES: Record<string, Personality> = {
       brawlFlee: ['Tepsiyi kurtarmam lazım!', 'Ben ocağa kaçıyorum!'],
       debtTease: ['Abi, defterde yer kalmadı!', 'Abi önce eski çayları bir öde.'],
       betRaise: ['Abi benim işim var ama olur, artıralım.', 'Bir çay daha koyalım abi.'],
+      teaSplashed: ['Abi o bardak benim zimmetimde!', 'Abi çay içilir, atılmaz!', 'Bardaklar! Taze demlemiştim!'],
+      teaSeen: ['Abi peçete getireyim mi?', 'Abi yüzünde çay kalmış, sil istersen.'],
     },
   },
   hasan: {
@@ -183,6 +195,8 @@ export const PERSONALITIES: Record<string, Personality> = {
       brawlFlee: ['Ben bankta uyumaya gidiyorum.', 'Bana dokunmayın, uykum var!'],
       debtTease: ['Borç... zzz... ödenir mi?', 'Veresiye defteri... rüyamda da vardı...'],
       betRaise: ['Artıralım mı? Ben uyurken karar verin...', 'Olur... zzz...'],
+      teaSplashed: ['Ha?! Yağmur mu yağıyor?', 'Rüyamda deniz vardı... çaymış.'],
+      teaSeen: ['Zzz... birinin yüzü çay olmuş... zzz', 'Ha, çay mı döküldü?'],
     },
   },
   ferhat: {
@@ -211,6 +225,8 @@ export const PERSONALITIES: Record<string, Personality> = {
       brawlFlee: ['Ben maça dönüyorum!', 'Sakatlanmadan kaçayım!'],
       debtTease: ['Borcun transfer bütçesi gibi, kabarık!', 'Kardeşim, önce kulübün borcunu kapat!'],
       betRaise: ['Gol gibi bahis istiyorum, artıralım!', 'Maç heyecanı lazım, ikiye katla!'],
+      teaSplashed: ['Faul! Çay faulü!', 'Formam! Şampiyonluk formam!'],
+      teaSeen: ['Yüzünde çay haritası var, ofsayt!', 'Kırmızı kart kadar kızarmış yüzün!'],
     },
   },
   kemal: {
@@ -239,6 +255,8 @@ export const PERSONALITIES: Record<string, Personality> = {
       brawlFlee: ['Muhtarlığa gidip tutanak getireyim!', 'Ben resmi işlere bakayım!'],
       debtTease: ['Muhtarlık kayıtlarında borçlu görünüyorsun.', 'Borç senedi imzaladın mı evlat?'],
       betRaise: ['Bütçe uygun, bahsi artırabiliriz.', 'Resmi teklifim: ikiye katlayalım.'],
+      teaSplashed: ['Muhtara çay atılmaz! Tutanak!', 'Resmi kıyafetim lekelendi!'],
+      teaSeen: ['Bu yüz resmi kayıtlara geçti.', 'Islak imza mı attın evlat?'],
     },
   },
 };

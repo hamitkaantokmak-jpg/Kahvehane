@@ -153,6 +153,55 @@ export class Effects {
     });
   }
 
+  /** Çay bardağı fırlatma: yay (arc) şeklinde uçuş, varınca onHit */
+  teaProjectile(from: THREE.Vector3, to: () => THREE.Vector3, onHit: () => void, glass: THREE.Object3D, duration = 0.55) {
+    const g = glass;
+    g.position.copy(from);
+    this.scene.add(g);
+    const start = from.clone();
+    this.list.push({
+      obj: g, t: 0, life: duration,
+      update: (fx) => {
+        const p = Math.min(1, fx.t / fx.life);
+        const end = to();
+        g.position.lerpVectors(start, end, p);
+        g.position.y += Math.sin(p * Math.PI) * (0.35 + start.distanceTo(end) * 0.12);
+        g.rotation.set(p * 9, p * 3, p * 6);
+        if (p >= 1 && !g.userData.hit) { g.userData.hit = true; onHit(); }
+      },
+    });
+  }
+
+  /** Çay sıçraması + cam kırıkları */
+  teaSplash(pos: THREE.Vector3) {
+    const grp = new THREE.Group();
+    grp.position.copy(pos);
+    const teaMat = new THREE.MeshBasicMaterial({ color: 0xb33a0e, transparent: true, opacity: 0.9, depthWrite: false });
+    const glassMat = new THREE.MeshBasicMaterial({ color: 0xdff4ff, transparent: true, opacity: 0.9, depthWrite: false });
+    const parts: { m: THREE.Mesh; v: THREE.Vector3; spin: number }[] = [];
+    for (let i = 0; i < 16; i++) {
+      const isGlass = i % 4 === 0;
+      const m = new THREE.Mesh(isGlass ? sharedGeo('shard', () => new THREE.TetrahedronGeometry(1)) : sharedGeo('drop', () => new THREE.SphereGeometry(1, 6, 5)), isGlass ? glassMat : teaMat);
+      m.scale.setScalar(isGlass ? 0.025 : 0.02 + Math.random() * 0.025);
+      const a = Math.random() * Math.PI * 2;
+      const v = new THREE.Vector3(Math.cos(a) * (0.6 + Math.random()), 0.8 + Math.random() * 1.4, Math.sin(a) * (0.6 + Math.random()));
+      grp.add(m);
+      parts.push({ m, v, spin: Math.random() * 10 });
+    }
+    this.scene.add(grp);
+    this.list.push({
+      obj: grp, t: 0, life: 0.9,
+      update: (fx, dt) => {
+        for (const p of parts) {
+          p.v.y -= 6 * dt;
+          p.m.position.addScaledVector(p.v, dt);
+          p.m.rotation.x += p.spin * dt;
+        }
+        teaMat.opacity = glassMat.opacity = 0.9 * (1 - fx.t / fx.life);
+      },
+    });
+  }
+
   update(dt: number) {
     for (const fx of this.list) {
       fx.t += dt;

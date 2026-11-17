@@ -2,11 +2,11 @@
  * Birleşik giriş: klavye + fare (pointer lock / sürükleme) + dokunmatik (sanal joystick, kamera sürükleme).
  */
 export type Action =
-  | 'interact' | 'bonk' | 'menu' | 'tea' | 'emote1' | 'emote2' | 'emote3' | 'emote4' | 'emote5' | 'emote6' | 'emote7' | 'emoteMenu';
+  | 'interact' | 'bonk' | 'menu' | 'tea' | 'throwTea' | 'emote1' | 'emote2' | 'emote3' | 'emote4' | 'emote5' | 'emote6' | 'emote7' | 'emote8' | 'emoteMenu';
 
 const KEY_ACTIONS: Record<string, Action> = {
   KeyE: 'interact', KeyF: 'bonk', Escape: 'menu', KeyT: 'tea', KeyQ: 'emoteMenu',
-  Digit1: 'emote1', Digit2: 'emote2', Digit3: 'emote3', Digit4: 'emote4', Digit5: 'emote5', Digit6: 'emote6', Digit7: 'emote7',
+  Digit1: 'emote1', Digit2: 'emote2', Digit3: 'emote3', Digit4: 'emote4', Digit5: 'emote5', Digit6: 'emote6', Digit7: 'emote7', Digit8: 'emote8', KeyG: 'throwTea',
 };
 
 export class Input {

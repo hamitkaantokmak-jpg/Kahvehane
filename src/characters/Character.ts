@@ -8,6 +8,7 @@ import { Animator } from './Animator';
 import { CharacterSpec } from './CharacterSpec';
 import type { Seat } from '../world/Kahvehane';
 import type { NavGrid, CollisionWorld } from '../world/Collision';
+import { StainState, newStain, updateStain, stainIntensity } from '../interactions/teaThrow';
 
 export interface BubbleHost {
   say(c: Character, text: string, seconds?: number): void;
@@ -30,6 +31,9 @@ export class Character {
   bubbleHost: BubbleHost | null = null;
   /** Taşınan nesne vb. */
   holding: THREE.Object3D | null = null;
+  /** Çaylı yüz durumu (saf mantık) */
+  readonly stain: StainState = newStain();
+  private stainTime = 0;
   /** Yerçekimi tarzı sıçrama (vurulunca) */
   private knockVel = new THREE.Vector3();
 
@@ -167,6 +171,9 @@ export class Character {
     }
     this.model.root.rotation.y = this.yaw;
     this.anim.speed += (speed - this.anim.speed) * Math.min(1, dt * 10);
+    updateStain(this.stain, dt);
+    this.stainTime += dt;
+    this.model.setStain(stainIntensity(this.stain), this.stainTime);
     this.animDt += dt;
     if (animate) { this.anim.update(Math.min(this.animDt, 0.2)); this.animDt = 0; }
   }
