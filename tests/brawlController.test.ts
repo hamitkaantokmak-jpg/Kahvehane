@@ -113,7 +113,7 @@ describe('Kişilik verisi', () => {
   it('her NPC için yeni replik kategorileri dolu ve ilişkiler geçerli kimliklere işaret ediyor', () => {
     const ids = Object.keys(PERSONALITIES);
     for (const p of Object.values(PERSONALITIES)) {
-      for (const k of ['brawlJoin', 'brawlBreakUp', 'calmDown', 'brawlFlee'] as const) {
+      for (const k of ['brawlJoin', 'brawlBreakUp', 'calmDown', 'brawlFlee', 'debtTease', 'betRaise'] as const) {
         expect(p.lines[k].length, `${p.id}.${k}`).toBeGreaterThanOrEqual(2);
         expect(new Set(p.lines[k]).size).toBe(p.lines[k].length);
       }
@@ -122,5 +122,21 @@ describe('Kişilik verisi', () => {
     }
     expect(PERSONALITIES.nihat.rivals).toEqual([]);
     expect(PERSONALITIES.riza.rivals).toContain('cemal');
+  });
+});
+
+describe('Çay siparişi kaybolmaz', () => {
+  it('Şükrü servis sırasında kavgaya çağrılırsa oyuncunun siparişi kuyruğa geri döner', () => {
+    vi.useFakeTimers();
+    const w = makeWorld(4);
+    const s = w.byId('sukru');
+    (w.world.teaRequests as unknown[]).push(w.player);
+    s.mode = 'serve';
+    (s as unknown as { serveStage: number; timer: number }).serveStage = 1;
+    (s as unknown as { timer: number }).timer = 0;
+    s.update(0.1); // siparişi alır, tepsiyle yola çıkar
+    expect(w.world.teaRequests.length).toBe(0);
+    s.enterBrawl('separator');
+    expect(w.world.teaRequests[0]).toBe(w.player);
   });
 });

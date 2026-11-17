@@ -10,7 +10,7 @@ import { applyOutlineVisibility } from '../world/materials';
 import { Character } from '../characters/Character';
 import { PLAYER_SPEC, NPC_SPECS } from '../characters/CharacterSpec';
 import { NPC, NpcWorld } from '../npc/NPC';
-import { PERSONALITIES, pickLine } from '../npc/personalities';
+import { PERSONALITIES, pickLine, SUKRU_LINES } from '../npc/personalities';
 import { Effects } from '../fx/Effects';
 import { Bubbles } from '../ui/Bubbles';
 import { Hud } from '../ui/Hud';
@@ -22,6 +22,9 @@ import { OcclusionFader } from '../player/OcclusionFader';
 import { ChaosDirector } from '../chaos/ChaosDirector';
 import { BrawlController } from '../npc/BrawlController';
 import { createRng, Rng } from '../games/common/rng';
+import { EconomyController } from '../economy/EconomyController';
+import { LocalEconomyStore } from '../economy/store';
+import { WORK_PAY, dayNumber } from '../economy/Economy';
 
 export class Game {
   readonly renderer: THREE.WebGLRenderer;
@@ -47,6 +50,9 @@ export class Game {
   chaos!: ChaosDirector;
   brawls!: BrawlController;
   private overflowCooldown = 0;
+  economy!: EconomyController;
+  private teaseT = 20;
+  private raiseT = 90;
   session: TableSession | null = null;
   private clock = new THREE.Clock();
   private frustum = new THREE.Frustum();
@@ -132,6 +138,13 @@ export class Game {
     this.fader = new OcclusionFader([...occluders, ...this.npcs.map((n) => n.c.model.root)]);
     this.social = new Social(this.player, this.npcs, this.effects, this.rig, this.world, (m) => this.hud.toast(m));
     this.hud.onEmote = (id) => this.social.emote(id);
+    // ekonomi (Aşama 2)
+    this.economy = new EconomyController(new LocalEconomyStore(), this.npcs.map((n) => n.id));
+    this.social.economy = this.economy;
+    this.economy.onChange((bal, debt, delta) => this.hud.setMoney(bal, debt, delta));
+    const now = new Date();
+    const bonus = this.economy.claimDaily(dayNumber(now.getTime(), now.getTimezoneOffset()));
+    if (bonus) setTimeout(() => this.hud.toast(`☀️ Günaydın! Günlük kahve parası: +${bonus}🪙`, 4), 1500);
     this.hud.onSettings = (s) => this.applySettings(s);
     this.brawls = new BrawlController(this.world, this.chaos, this.rng, {
       playerBonked: (by) => this.social.playerBonked(by),
@@ -233,6 +246,7 @@ export class Game {
       }
       this.kahve.update(dt);
       this.updateChaos(dt);
+      this.updateEconomy(dt);
       this.effects.update(dt);
     }
     const look = this.input.consumeLook();
@@ -242,6 +256,29 @@ export class Game {
     if (this.mode === 'explore') this.fader.update(this.camera.position, follow); else this.fader.update(null, follow);
     this.bubbles.update();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  private updateEconomy(dt: number) {
+    const sukru = this.npcs.find((n) => n.id === 'sukru');
+    if (this.economy.update(dt).raiseEnded) sukru?.c.say(pickLine(SUKRU_LINES.raiseOver), 2.5);
+    this.raiseT -= dt;
+    if (this.raiseT <= 0) {
+      this.raiseT = 120;
+      if (this.economy.maybeRaise(this.rng)) {
+        sukru?.c.say(pickLine(SUKRU_LINES.raise), 3.5);
+        this.hud.toast(`📈 Şükrü zam yaptı: çay artık ${this.economy.price('tea')}🪙`);
+      }
+    }
+    // veresiye sınırını aşan oyuncuya yakındaki NPC'ler laf atar
+    this.teaseT -= dt;
+    if (this.teaseT <= 0) {
+      this.teaseT = 25 + this.rng() * 20;
+      if (this.economy.overLimit && this.mode === 'explore') {
+        const near = this.npcs.filter((n) => !n.inBrawl && n.mode !== 'inGame' && n.c.pos.distanceTo(this.player.pos) < 5);
+        const n = near[Math.floor(this.rng() * near.length)];
+        if (n) { n.c.faceTowards(this.player.pos); n.c.say(pickLine(n.p.lines.debtTease), 3); n.c.anim.play('point'); }
+      }
+    }
   }
 
   private updateChaos(dt: number) {
@@ -342,10 +379,11 @@ export class Game {
     switch (it.kind) {
       case 'seat': return `Otur — ${(it.ref as Seat).table.name}`;
       case 'tv': return 'Kanalı değiştir';
-      case 'semaver': return this.social.playerHasTea ? 'Bir çay daha doldur' : 'Kendine çay doldur';
+      case 'semaver': return this.economy.broke ? `Bulaşık yıka (+${WORK_PAY}🪙)` : `${this.social.playerHasTea ? 'Bir çay daha doldur' : 'Kendine çay doldur'} (${this.economy.price('tea')}🪙)`;
       case 'door': return 'Dışarı çık';
       case 'npc': {
         const n = it.ref as NPC;
+        if (n.id === 'sukru' && this.economy.debt > 0 && this.economy.balance > 0) return `Şükrü'ye borcunu öde (${this.economy.debt}🪙)`;
         return n.mode === 'sleep' ? `${n.c.name}'ı dürt` : `${n.c.name} ile konuş · F: ıstaka`;
       }
       default: return it.label;
@@ -370,12 +408,30 @@ export class Game {
           sfx.play('angry', n.c.spec.voicePitch);
         }
         break;
-      case 'semaver':
+      case 'semaver': {
         p.faceTowards(this.kahve.semaverPos);
+        if (this.economy.broke) {
+          const w = this.economy.work();
+          if (!w) { this.hud.toast('Az önce yıkadın, biraz dinlen.'); break; }
+          p.anim.play('pour');
+          sfx.play('pour');
+          setTimeout(() => sfx.play('glass'), 700);
+          const s = this.npcs.find((n) => n.id === 'sukru');
+          s?.c.say(pickLine(SUKRU_LINES.workDone), 2.5);
+          this.hud.toast(w.toDebt ? `Bulaşık yıkadın: ${w.toDebt}🪙 borçtan düştü${w.earned - w.toDebt ? `, ${w.earned - w.toDebt}🪙 cebe` : ''}.` : `Bulaşık yıkadın: +${w.earned}🪙`);
+          break;
+        }
+        const r = this.economy.buy('tea');
+        if (!r.ok) {
+          this.hud.toast('Veresiye defteri doldu! Önce borcunu öde ya da bulaşık yıka.');
+          this.npcs.find((n) => n.id === 'sukru')?.c.say(pickLine(SUKRU_LINES.noCredit), 3);
+          break;
+        }
         p.anim.play('pour');
         sfx.play('pour');
-        setTimeout(() => { this.social.setPlayerTea(true); sfx.play('glass'); this.hud.toast('Çayını doldurdun. 7 ile iç!'); this.stats.teas++; saveStats(this.stats); }, 1800);
+        setTimeout(() => { this.social.setPlayerTea(true); sfx.play('glass'); this.hud.toast(`Çayını doldurdun (${r.price}🪙${r.onCredit ? `, ${r.onCredit}🪙 veresiye` : ''}). 7 ile iç!`); this.stats.teas++; saveStats(this.stats); }, 1800);
         break;
+      }
       case 'door':
         p.say(pickLine(['Dışarısı soğuk, içerisi muhabbet. Kalayım.', 'Eve gidersem okey kaçar...', 'Bir el daha oynar, öyle giderim.']), 3);
         p.anim.play('shrug');
@@ -383,6 +439,14 @@ export class Game {
       case 'npc': {
         const n = it.ref as NPC;
         p.faceTowards(n.c.pos);
+        if (n.id === 'sukru' && this.economy.debt > 0 && this.economy.balance > 0) {
+          const paid = this.economy.payDebt();
+          n.c.say(pickLine(this.economy.debt === 0 ? SUKRU_LINES.paid : SUKRU_LINES.credit), 2.5);
+          n.c.anim.play('wave');
+          sfx.play('glass');
+          this.hud.toast(`Borç ödendi: ${paid}🪙${this.economy.debt ? ` (kalan ${this.economy.debt}🪙)` : ' — hesap temiz!'}`);
+          break;
+        }
         if (n.mode === 'sleep') {
           n.c.anim.posture = 'sit';
           n.mode = 'seated';
@@ -440,6 +504,9 @@ export class Game {
     this.input.enabled = true;
     this.hud.setVisible(true);
   }
+
+  /** Para sesi */
+  audioCoins() { sfx.play('coin'); }
 
   recordResult(gameId: string, won: boolean) {
     this.stats.played[gameId] = (this.stats.played[gameId] ?? 0) + 1;

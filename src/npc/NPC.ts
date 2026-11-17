@@ -291,6 +291,7 @@ export class NPC {
     c.stopWalking();
     this.releaseReservations();
     if (this.serveStage === 2 || this.serveStage === 1) {
+      this.requeueOrder();
       c.model.handPropL.clear();
       c.anim.stop('carry');
       this.serveStage = 0;
@@ -317,7 +318,17 @@ export class NPC {
     if (this.anger >= ANGER_BRAWL && this.w.requestBrawl?.(this.id, 'player')) this.retaliatePending = false;
   }
 
+  /** Servis yarıda kesilirse taşınan sipariş kaybolmasın: kuyruğun başına geri konur */
+  private requeueOrder() {
+    if (this.serveTarget && this.serveStage >= 1 && this.serveStage <= 2 && !this.wrongOrder) {
+      const t = this.serveTarget;
+      if (t === this.w.player && !this.w.teaRequests.includes(t)) this.w.teaRequests.unshift(t);
+    }
+    this.serveTarget = null;
+  }
+
   enterBrawl(role: 'fighter' | 'helper' | 'separator' | 'fleer') {
+    this.requeueOrder();
     if (this.mode === 'inGame') this.awayFromGame = true;
     this.inBrawl = true;
     this.brawlRole = role;
@@ -542,6 +553,7 @@ export class NPC {
     this.releaseReservations();
     if (c.seated) c.standUp();
     // eldeki tepsi vb. temizle
+    this.requeueOrder();
     c.model.handPropL.clear();
     c.model.setHeldProp(null);
     c.anim.stop('carry');
