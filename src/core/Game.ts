@@ -18,6 +18,7 @@ import { Social, EMOTES } from '../interactions/Social';
 import { sfx } from '../audio/Sfx';
 import { loadSettings, saveSettings, Settings, loadStats, saveStats, Stats } from '../save/Settings';
 import { TableSession } from '../tables/TableSession';
+import { OcclusionFader } from '../player/OcclusionFader';
 
 export class Game {
   readonly renderer: THREE.WebGLRenderer;
@@ -40,6 +41,7 @@ export class Game {
   mode: 'explore' | 'seated' = 'explore';
   session: TableSession | null = null;
   private clock = new THREE.Clock();
+  fader!: OcclusionFader;
   private focus: Interactable | null = null;
   private stepT = 0;
   private fpsFrames = 0;
@@ -69,7 +71,9 @@ export class Game {
     this.scene.add(this.kahve.group);
     this.nav = new NavGrid(this.kahve.collision, 0.25, 0.32);
     this.rig = new CameraRig(this.camera);
-    this.rig.occluders = this.kahve.group.children.filter((o) => o.type === 'Group' && o.children.some((c) => c.userData.wall));
+    const walls: THREE.Object3D[] = [];
+    this.kahve.group.traverse((o) => { if (o.userData.wall) walls.push(o); });
+    this.rig.occluders = walls;
     this.input = new Input(this.renderer.domElement, this.overlay);
     this.effects = new Effects(this.scene);
     this.bubbles = new Bubbles(this.overlay, this.camera);
@@ -106,6 +110,9 @@ export class Game {
     // başlangıçta bazıları oturuyor olsun (yaşayan ortam)
     this.presetScene();
 
+    const occluders: THREE.Object3D[] = [];
+    this.kahve.group.traverse((o) => { if (o.userData.occluder) occluders.push(o); });
+    this.fader = new OcclusionFader([...occluders, ...this.npcs.map((n) => n.c.model.root)]);
     this.social = new Social(this.player, this.npcs, this.effects, this.rig, this.world, (m) => this.hud.toast(m));
     this.hud.onEmote = (id) => this.social.emote(id);
     this.hud.onSettings = (s) => this.applySettings(s);
@@ -198,6 +205,7 @@ export class Game {
     if (this.mode === 'explore' && !paused) this.rig.look(look.dx, look.dy, look.zoom);
     const follow = this.player.pos.clone().add(new THREE.Vector3(0, 1.25, 0));
     this.rig.update(dt, follow);
+    if (this.mode === 'explore') this.fader.update(this.camera.position, follow); else this.fader.update(null, follow);
     this.bubbles.update();
     this.renderer.render(this.scene, this.camera);
   }

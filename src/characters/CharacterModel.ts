@@ -5,6 +5,7 @@
 import * as THREE from 'three';
 import { CharacterSpec } from './CharacterSpec';
 import { toonMesh, sharedGeo, toonMat } from '../world/materials';
+import { mergeJointChildren } from '../world/merge';
 
 const SPH = (seg = 20) => sharedGeo(`sph${seg}`, () => new THREE.SphereGeometry(1, seg, Math.round(seg * 0.75)));
 const CYL = () => sharedGeo('cyl', () => new THREE.CylinderGeometry(1, 1, 1, 12).translate(0, -0.5, 0)); // tepe 0, alt -1
@@ -35,6 +36,12 @@ export class CharacterModel {
   readonly head = new THREE.Group();
   readonly bellyMesh: THREE.Mesh;
   readonly mouth: THREE.Mesh;
+  /** Gülümseme / somurtma yayı */
+  readonly smile: THREE.Mesh;
+  /** Utanma kızarıklığı (yanaklar) */
+  readonly blush: THREE.Mesh[] = [];
+  readonly blushMat: THREE.MeshBasicMaterial;
+  readonly pupils: THREE.Mesh[] = [];
   readonly eyes: THREE.Group[] = [];
   readonly brows: THREE.Mesh[] = [];
   readonly mustache = new THREE.Group();
@@ -125,6 +132,8 @@ export class CharacterModel {
       eye.position.set(sx * eyeX, eyeY, faceZ * 0.86);
       eye.add(part(SPH(14), 0xffffff, [hr * 0.2, hr * 0.24, hr * 0.12], [0, 0, 0], 0.01));
       const pupil = part(SPH(10), 0x1b1b1b, [hr * 0.08, hr * 0.1, hr * 0.06], [-sx * hr * 0.02, -hr * 0.02, hr * 0.09], 0);
+      pupil.userData.keep = true;
+      this.pupils.push(pupil);
       eye.add(pupil);
       if (s.accessories.includes('glasses')) {
         const rim = part(sharedGeo('rim', () => new THREE.TorusGeometry(1, 0.12, 6, 18)), 0x222222, [hr * 0.24, hr * 0.24, hr * 0.24], [0, 0, hr * 0.12], 0);
@@ -147,6 +156,19 @@ export class CharacterModel {
     // ağız
     this.mouth = part(SPH(12), 0x5a1414, [hr * 0.2, hr * 0.05, hr * 0.08], [0, -hr * 0.42, faceZ * 0.86], 0.006);
     this.head.add(this.mouth);
+    this.smile = new THREE.Mesh(sharedGeo('smileArc', () => new THREE.TorusGeometry(1, 0.22, 6, 14, Math.PI)), toonMat(0x5a1414));
+    this.smile.scale.setScalar(hr * 0.16);
+    this.smile.position.set(0, -hr * 0.4, faceZ * 0.9);
+    this.head.add(this.smile);
+    this.blushMat = new THREE.MeshBasicMaterial({ color: 0xff5a6e, transparent: true, opacity: 0, depthWrite: false });
+    for (const sx of [1, -1]) {
+      const b = new THREE.Mesh(sharedGeo('blushDisc', () => new THREE.SphereGeometry(1, 10, 6)), this.blushMat);
+      b.scale.set(hr * 0.17, hr * 0.1, hr * 0.05);
+      b.position.set(sx * hr * 0.55 * hs[0], -hr * 0.12, faceZ * 0.82);
+      b.renderOrder = 2;
+      this.head.add(b);
+      this.blush.push(b);
+    }
     // bıyık
     this.mustache.position.set(0, -hr * 0.28, faceZ * 0.93);
     this.head.add(this.mustache);
@@ -248,6 +270,22 @@ export class CharacterModel {
     this.legL = mkLeg(1);
     this.legR = mkLeg(-1);
 
+    this.mouth.userData.keep = true;
+    this.smile.userData.keep = true;
+    for (const b of this.blush) b.userData.keep = true;
+    this.bellyMesh.userData.keep = true;
+    for (const b of this.brows) b.userData.keep = true;
+    mergeJointChildren(this.root);
+    // küçük parçalar gölge atmasın (gölge geçişindeki çizim çağrılarını azaltır)
+    this.root.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh || m.userData.isOutline) return;
+      if (!m.geometry.boundingSphere) m.geometry.computeBoundingSphere();
+      const sc = new THREE.Vector3(); m.getWorldScale(sc);
+      if ((m.geometry.boundingSphere?.radius ?? 1) * Math.max(sc.x, sc.y, sc.z) < 0.09) m.castShadow = false;
+    });
+    this.blush.forEach((b) => (b.castShadow = false));
+    this.smile.castShadow = false;
     this.headTopY = (legLen + torsoH * 0.95 + 0.1 + hr * 0.85 + hr * hs[1] + 0.08) * s.height;
   }
 

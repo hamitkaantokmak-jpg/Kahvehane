@@ -22,6 +22,9 @@ export interface Pose {
   squash: number; // + uzama, - basılma
   mouth: number; // 0..1 açıklık
   brow: number; // -1 kızgın, +1 şaşkın
+  smile: number; // -1 somurtma .. +1 gülümseme
+  blush: number; // 0..1 utanma
+  wide: number; // 0..1 faltaşı gibi açık gözler
   rootRotX: number; // tüm vücut (düşme)
   rootRotZ: number;
 }
@@ -29,7 +32,7 @@ export interface Pose {
 export const ZERO_POSE: Pose = {
   bodyY: 0, bodyZ: 0, lean: 0, twist: 0, tilt: 0, headX: 0, headY: 0, headZ: 0,
   shLX: 0, shLZ: 0.12, elL: -0.15, shRX: 0, shRZ: -0.12, elR: -0.15,
-  hipLX: 0, kneeL: 0, hipRX: 0, kneeR: 0, squash: 0, mouth: 0, brow: 0, rootRotX: 0, rootRotZ: 0,
+  hipLX: 0, kneeL: 0, hipRX: 0, kneeR: 0, squash: 0, mouth: 0, brow: 0, smile: 0.25, blush: 0, wide: 0, rootRotX: 0, rootRotZ: 0,
 };
 const KEYS = Object.keys(ZERO_POSE) as (keyof Pose)[];
 
@@ -208,6 +211,15 @@ export const ACTIONS: Record<ActionName, ActionDef> = {
   },
 };
 
+/** Eylemlere eşlik eden yüz ifadeleri (eylem ağırlığıyla karışır). */
+const EXPR: Partial<Record<ActionName, Partial<Pose>>> = {
+  laugh: { smile: 1 }, clap: { smile: 0.8 }, bellyDance: { smile: 0.9 }, cheer: { smile: 1, wide: 0.4 }, wave: { smile: 0.7 },
+  angry: { smile: -1 }, slamTable: { smile: -0.8 }, think: { smile: -0.3 }, facepalm: { smile: -0.5, blush: 1 },
+  shrug: { smile: -0.2, blush: 0.4 }, surprise: { wide: 1, smile: 0 }, talk: { smile: 0.35 }, point: { smile: 0.5 },
+  drink: { smile: 0.6 }, stagger: { wide: 1, blush: 0.6, smile: -0.4 }, fall: { wide: 1, blush: 0.9, smile: -0.6 },
+  swing: { smile: -0.6 }, leanBack: { smile: 0.6 }, pour: { smile: 0.4 },
+};
+
 interface ActiveAction {
   name: ActionName;
   t: number;
@@ -349,6 +361,7 @@ export class Animator {
         base.lean = -0.15 * w; base.rootRotX = -0.12 * w;
         base.headX = 0.55 + S(this.time * 0.8) * 0.06; base.headZ = 0.3;
         base.mouth = 0.25 + S(this.time * 0.8) * 0.2;
+        base.smile = 0;
         base.shLZ = 0.35; base.shRZ = -0.35; base.elL = -0.3; base.elR = -0.3; base.shLX = -0.2; base.shRX = -0.2;
         base.squash = S(this.time * 0.8) * 0.04;
       }
@@ -367,7 +380,7 @@ export class Animator {
         a.weight = Math.min(1, a.weight + dt / bi);
         if (!a.def.loop && a.t >= dur - bo) a.weight = Math.min(a.weight, Math.max(0, (dur - a.t) / bo));
       }
-      const ap = a.def.pose(p, a.t, base, seated);
+      const ap = { ...EXPR[a.name], ...a.def.pose(p, a.t, base, seated) };
       for (const k of KEYS) {
         const v = ap[k];
         if (v === undefined) continue;
@@ -425,13 +438,29 @@ export class Animator {
     m.legR.end.rotation.x = -(p.hipRX + p.kneeR) * 0.6;
     // ağız / kaş / göz
     const ms = m.spec.headSize;
+    // ifade: ağız kapalıyken gülümseme/somurtma yayı, yanak kızarıklığı, iri gözler
+    const showArc = p.mouth < 0.3 && Math.abs(p.smile) > 0.12;
+    m.smile.visible = showArc;
+    m.mouth.visible = !showArc || p.mouth > 0.15;
+    if (showArc) {
+      m.smile.rotation.z = p.smile > 0 ? Math.PI : 0; // ∪ gülümseme, ∩ somurtma
+      const k = Math.min(1, Math.abs(p.smile));
+      m.smile.scale.set(ms * 0.16 * (0.7 + 0.5 * k), ms * 0.16 * (0.4 + 0.6 * k), ms * 0.12);
+      m.smile.position.y = -ms * (p.smile > 0 ? 0.36 : 0.48);
+    }
+    m.blushMat.opacity = Math.min(0.75, p.blush * 0.75);
+    for (const pu of m.pupils) {
+      const b = (pu.userData.base ??= pu.scale.clone()) as THREE.Vector3;
+      pu.scale.copy(b).multiplyScalar(1 - p.wide * 0.35);
+    }
     m.mouth.scale.set(ms * 0.2 * (1 - p.mouth * 0.2), ms * (0.05 + p.mouth * 0.22), ms * 0.08);
     for (let i = 0; i < 2; i++) {
       const brow = m.brows[i];
       const side = i === 0 ? 1 : -1;
       brow.rotation.z = p.brow < 0 ? side * 0.45 * -p.brow : -side * 0.15 * p.brow;
       brow.position.y = ms * 0.18 + ms * 0.3 + p.brow * ms * 0.08;
-      m.eyes[i].scale.y = this.blink > 0 ? 0.1 : 1 + Math.max(0, p.brow) * 0.15;
+      const wideK = 1 + p.wide * 0.3;
+      m.eyes[i].scale.set(wideK, this.blink > 0 ? 0.1 : (1 + Math.max(0, p.brow) * 0.15) * wideK, wideK);
     }
     // ikincil hareket: göbek ve bıyık
     const vy = (p.bodyY - this.prevBodyY) / Math.max(dt, 1e-4);

@@ -59,3 +59,22 @@ test('Yürüme, koşma ve masaya oturma (klavye)', async ({ page }) => {
   expect(await page.evaluate(() => (window as unknown as W).__game.mode)).toBe('explore');
   expect(errs).toEqual([]);
 });
+
+test('Kamera ile oyuncu arasına giren NPC ve askılık saydamlaşır', async ({ page }) => {
+  const errs = trackErrors(page);
+  await boot(page);
+  await page.evaluate(() => {
+    const g = (window as unknown as W).__game;
+    const n = g.npcs.find((x: any) => x.id === 'cemal');
+    if (n.c.seated) n.c.standUp();
+    n.mode = 'inGame'; n.c.stopWalking();
+    g.player.pos.set(-3, 0, 1.2); g.player.yaw = Math.PI;
+    n.c.pos.set(-3, 0, 2.6);
+    g.rig.yaw = 0; g.rig.pitch = 0.15; g.rig.distance = 3.4;
+  });
+  await page.waitForFunction(() => (window as unknown as W).__game.fader.count > 0, null, { timeout: 30_000 });
+  // NPC uzaklaşınca geri opaklaşır
+  await page.evaluate(() => { const g = (window as unknown as W).__game; g.npcs.find((x: any) => x.id === 'cemal').c.pos.set(6, 0, -4); });
+  await page.waitForFunction(() => (window as unknown as W).__game.fader.count === 0, null, { timeout: 30_000 });
+  expect(errs).toEqual([]);
+});

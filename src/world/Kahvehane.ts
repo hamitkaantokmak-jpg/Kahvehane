@@ -6,6 +6,7 @@ import { mergeGeometries } from 'three/examples/jsm/utils/BufferGeometryUtils.js
 import { toonMesh, toonMat, sharedGeo, PALETTE, outlineMat } from './materials';
 import { floorTexture, wallpaperTexture, signTexture, calendarTexture, posterTexture, TvScreen } from './textures';
 import { CollisionWorld } from './Collision';
+import { mergeStatic } from './merge';
 import { makeTeaGlass } from '../characters/CharacterModel';
 import { GameId } from '../games/common/types';
 
@@ -78,7 +79,9 @@ export class Kahvehane {
     this.buildTables();
     this.buildDecor();
     this.buildLights();
+    this.mergeStats = mergeStatic(this.group);
   }
+  mergeStats = { before: 0, after: 0 };
 
   // ------------------------------------------------------------------ oda
   private buildRoom() {
@@ -263,6 +266,7 @@ export class Kahvehane {
       const p = new THREE.Mesh(sharedGeo('steam', () => new THREE.SphereGeometry(0.05, 8, 6)), steamMat.clone());
       p.position.set(-8.35, 2.0, -4.6);
       p.userData.phase = i / 6;
+      p.userData.dynamic = true;
       this.steam.push(p);
       g.add(p);
     }
@@ -367,6 +371,9 @@ export class Kahvehane {
     this.collision.addBox(x, z, size + 0.1, size + 0.1, `table:${id}`);
 
     const def: TableDef = { id, kind, name, center: new THREE.Vector3(x, 0, z), seats: [], games: TABLE_GAMES[kind], group, props: new THREE.Group(), live: new THREE.Group() };
+    def.props.userData.dynamic = true;
+    def.props.userData.mergeInside = true;
+    def.live.userData.dynamic = true;
     group.add(def.props, def.live);
     // sandalyeler: 0 güney(+z), 1 doğu(+x)... oturma sırası saat yönünün tersine
     const seatDirs = kind === 'tavla' ? [[0, 1], [0, -1]] : [[0, 1], [1, 0], [0, -1], [-1, 0]];
@@ -481,6 +488,7 @@ export class Kahvehane {
       h.position.y = len / 2;
       pivot.add(h);
       pivot.position.z = 0.045;
+      pivot.userData.dynamic = true;
       clock.add(pivot);
       return pivot;
     };
@@ -524,27 +532,33 @@ export class Kahvehane {
     this.benchSeats.push({ pos: new THREE.Vector3(-5.9, 0, 5.75), yaw: Math.PI, occupant: null }, { pos: new THREE.Vector3(-4.7, 0, 5.75), yaw: Math.PI, occupant: null });
     // saksılar
     for (const [x, z] of [[-8.4, 6.4], [8.4, 6.4], [8.4, -6.4], [-1.6, -6.5]]) {
+      const potGroup = new THREE.Group();
+      potGroup.userData.occluder = true;
+      g.add(potGroup);
       const pot = toonMesh(sharedGeo('pot', () => new THREE.CylinderGeometry(0.25, 0.18, 0.45, 12)), 0xc1440e, 0.015);
       pot.position.set(x, 0.225, z);
-      g.add(pot);
+      potGroup.add(pot);
       for (let k = 0; k < 5; k++) {
         const leaf = toonMesh(sharedGeo('leaf', () => new THREE.SphereGeometry(0.2, 10, 8)), 0x3f9b4a, 0.012);
         leaf.position.set(x + Math.cos(k * 1.3) * 0.18, 0.75 + (k % 2) * 0.25, z + Math.sin(k * 1.3) * 0.18);
         leaf.scale.set(0.8, 1.3, 0.8);
-        g.add(leaf);
+        potGroup.add(leaf);
       }
       this.collision.addCircle(x, z, 0.3, 'pot');
     }
     // askılık
     const rack = toonMesh(sharedGeo('coatRack', () => new THREE.CylinderGeometry(0.04, 0.05, 1.9, 8)), PALETTE.woodDark, 0.012);
     rack.position.set(1.8, 0.95, 6.4);
-    g.add(rack);
+    const rackGroup = new THREE.Group();
+    rackGroup.userData.occluder = true;
+    g.add(rackGroup);
+    rackGroup.add(rack);
     const coat = toonMesh(sharedGeo('coat', () => new THREE.CapsuleGeometry(0.18, 0.5, 4, 10)), 0x5d4037, 0.015);
     coat.position.set(1.95, 1.4, 6.4);
-    g.add(coat);
+    rackGroup.add(coat);
     const hat = toonMesh(sharedGeo('hangHat', () => new THREE.SphereGeometry(0.15, 12, 8, 0, Math.PI * 2, 0, Math.PI / 2)), 0x333333, 0.01);
     hat.position.set(1.7, 1.85, 6.4);
-    g.add(hat);
+    rackGroup.add(hat);
     this.collision.addCircle(1.8, 6.4, 0.3, 'rack');
     // tavan vantilatörü
     const fan = new THREE.Group();
@@ -562,6 +576,7 @@ export class Kahvehane {
     }
     fan.add(blades);
     this.fan = blades;
+    blades.userData.dynamic = true;
     g.add(fan);
     // radyo (köşede)
     const radio = toonMesh(new THREE.BoxGeometry(0.5, 0.3, 0.2), 0x8d5524, 0.015);
