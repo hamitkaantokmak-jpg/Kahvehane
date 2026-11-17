@@ -316,3 +316,25 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
     radial-gradient(ellipse 90% 80% at 50% 50%, transparent 60%, rgba(154, 74, 18, .35) 100%); }
 .throw-btn { position: absolute; top: 112px; left: 12px; z-index: 26; }
 .throw-pick { position: absolute; top: 152px; left: 12px; z-index: 26; display: flex; flex-direction: column; gap: 4px; }
+
+/* ------------------------------------------------ dart */
+.gui.dart { background: none; justify-content: space-between; pointer-events: none; }
+.gui.dart > * { pointer-events: auto; }
+.dart-score { display: flex; gap: 8px; margin-top: 60px; flex-wrap: wrap; justify-content: center; }
+.dart-score .ds { background: var(--paper); border: 3px solid var(--ink); border-radius: 12px; padding: 4px 12px; text-align: center; min-width: 110px; }
+.dart-score .ds.turn { background: var(--gold); animation: glow 1.2s infinite; }
+.dart-score .ds .rem { font-size: 28px; font-weight: 900; font-family: Georgia, serif; }
+.dart-score .ds.info { font-size: 12px; min-width: 0; }
+.dart-log { position: absolute; left: 10px; top: 150px; display: flex; flex-direction: column; gap: 4px; max-width: 46vw; pointer-events: none !important; }
+.dart-log .dl { background: rgba(255, 243, 214, .9); border: 2px solid var(--ink); border-radius: 8px; padding: 2px 8px; font-size: 13px; font-weight: 700; }
+.dart-log .dl:first-child { background: var(--gold); }
+.dart-power { position: absolute; right: 16px; top: 30%; width: 34px; height: 200px; border: 3px solid var(--ink); border-radius: 10px; background: linear-gradient(to top, #5ad17a 0%, #f2b134 50%, #5ad17a 60%, #d9412b 100%); display: flex; align-items: flex-end; justify-content: center; overflow: hidden; pointer-events: none !important; }
+.dart-power .fill { position: absolute; left: 0; right: 0; bottom: 0; background: rgba(42, 26, 16, .55); border-top: 3px solid #fff; }
+.dart-power span { position: absolute; top: -22px; font-weight: 800; color: var(--paper); }
+.dart-power::after { content: ""; position: absolute; left: -4px; right: -4px; top: 38%; height: 4px; background: #fff; }
+.dart-opts { text-align: left; max-width: 340px; margin: 0 auto; }
+.gui.dart .status { margin-top: auto; }
+.horse-list { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; }
+.horse-btn { display: flex; align-items: center; gap: 6px; justify-content: space-between; }
+.hc { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ink); }
+@media (max-width: 520px) { .horse-list { grid-template-columns: 1fr; } }

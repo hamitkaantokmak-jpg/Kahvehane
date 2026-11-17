@@ -21,7 +21,8 @@ Mobil: sol yarı sanal joystick (uzağa çekince koşar), sağ yarı kamera, ✋
 | `src/chaos` | **Saf mantık:** Kaos Direktörü (gerginlik, olay seçimi, kayıt defteri), zincirleme kavga modeli |
 | `src/economy` | **Saf mantık:** cüzdan, veresiye defteri, fiyatlar/zam, günlük bonus, iflas koruması, bahis hesabı; kalıcılık arayüzü |
 | `src/games/common` | RNG, taş seti, per doğrulama, el çözümleyici (grafikten bağımsız) |
-| `src/games/okey`, `okey101`, `tavla`, `pisti` | Her oyunun kural motoru + ayrı bot modülü |
+| `src/games/okey`, `okey101`, `tavla`, `pisti`, `dart` | Her oyunun kural motoru + ayrı bot modülü |
+| `src/games/atyarisi` | TV at yarışı motoru (saf, tohumlu) |
 | `src/world` | Kahvehane sahnesi, materyaller, prosedürel dokular, çarpışma + A* yol bulma |
 | `src/characters` | Modüler karakter tanımı (gelecekteki karakter oluşturucu için), model, prosedürel animatör |
 | `src/npc` | Kişilikler/replikler (dost/rakip ilişkileri), davranış sistemi, kavga davranış katmanı (`BrawlController`) |
@@ -116,3 +117,19 @@ taşa, karta ya da bota etkisi yoktur; masada oynarken de çalışır ("💦 Ça
 - **Tepkiler:** isabet gerginliğe +6 ekler; NPC kişiliğine göre söylenir, sinirliler kendi parasıyla çay fırlatarak karşılık verir,
   öfkesi taşarsa kavga başlar. Çaylı yüzlü birini gören NPC'ler laf atar (`teaSplashed`, `teaSeen` replikleri).
 - **Ayar:** Menü → Çay fırlatma: Herkes / Kapalı (kapalıyken oyuncu da NPC'ler de fırlatamaz).
+
+## Dart ve TV'de at yarışı (Aşama 4)
+**Dart** (`src/games/dart/dart.ts` + `dartBot.ts`, arayüz `ui/games/DartUI.ts`, 3D `tables/DartSession.ts`):
+- Sol duvardaki tahtanın önüne (kırmızı çizgi) gidip E. 301 / 501, isteğe bağlı **çift ile bitirme**, isteğe bağlı 2'şer kişilik takım.
+- Standart tahta: 20 dilim, üçlü/çift halka, dış boğa 25, iç boğa 50 (çift sayılır). Her turda 3 ok.
+- **Bust:** kalan negatife düşerse, çiftle bitirme açıkken 1'e inerse ya da 0'a çift olmayan okla inerse tur geçersiz (puan geri alınır).
+- **Kontrol:** fare/parmakla tahtaya nişan al (mavi halka), basılı tut → güç çubuğu gidip gelir, beyaz çizgiye yakınken bırak.
+  Güç azsa ok aşağı, fazlaysa yukarı sapar. Son 60 sn'de çay içtiysen ya da yüzün çaylıysa nişan titrer.
+- Botlar kişiliğe göre isabet eder: Rıza ağır ve isabetli, Cemal iddialı (hep üçlü 20'ye) ama sapan, Hasan uykulu...
+  Kötü atış duvara saplanabilir (yalnızca görsel şaka). Bahisli oynanabilir (kaybeden taraf öder).
+
+**At yarışı** (`src/games/atyarisi/atyarisi.ts`, oyun katmanı `world/HorseRaceTV.ts`):
+- Birkaç dakikada bir TV'de yarış açılır: 40 sn bahis süresi → yarış → sonuç. 6 komik isimli at, güçlerine göre oranlar.
+- Sonuç tohumdan tek seferde belirlenir (aynı tohum = aynı sonuç); TV yalnızca oynatır.
+- TV'ye gidip E → at ve miktar (5/10/20/50🪙, yalnızca nakit) seç. Kazanırsan yatırdığın × oran (aşağı yuvarlanır).
+- NPC'ler de bahis yapar (Cemal her zaman, uzun oranlı atlara). Foto finişte kaybedenler "Hileli!" diye bağırır, gerginlik artar.

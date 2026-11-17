@@ -39,7 +39,7 @@ export interface TableDef {
 
 export interface Interactable {
   id: string;
-  kind: 'seat' | 'tv' | 'semaver' | 'door' | 'npc' | 'sign' | 'radio';
+  kind: 'seat' | 'tv' | 'semaver' | 'door' | 'npc' | 'sign' | 'radio' | 'dart';
   pos: THREE.Vector3;
   radius: number;
   label: string;
@@ -578,6 +578,8 @@ export class Kahvehane {
     this.fan = blades;
     blades.userData.dynamic = true;
     g.add(fan);
+    // dart tahtası (sol duvar) + atış çizgisi
+    this.buildDartBoard();
     // radyo (köşede)
     const radio = toonMesh(new THREE.BoxGeometry(0.5, 0.3, 0.2), 0x8d5524, 0.015);
     radio.position.set(-8.35, 1.21, -2.9);
@@ -586,6 +588,36 @@ export class Kahvehane {
     grill.rotation.z = Math.PI / 2;
     grill.position.set(-8.09, 1.21, -2.95);
     g.add(grill);
+  }
+
+  /** Dart tahtası: merkez dünya koordinatı, tahta yarıçapı (çift halkanın dış kenarı) */
+  readonly dartCenter = new THREE.Vector3(-8.93, 1.73, 4.4);
+  readonly dartRadius = 0.26;
+  readonly dartThrowPos = new THREE.Vector3(-6.3, 0, 4.4);
+  readonly dartGroup = new THREE.Group();
+
+  private buildDartBoard() {
+    const g = this.dartGroup;
+    g.position.copy(this.dartCenter);
+    g.rotation.y = Math.PI / 2; // +x'e (odaya) bakar
+    g.userData.dynamic = true; // saplanan oklar eklenir
+    const back = toonMesh(sharedGeo('dartBack', () => new THREE.CylinderGeometry(1, 1, 0.04, 40).rotateX(Math.PI / 2)), 0x2b2b2b, 0.015);
+    back.scale.set(this.dartRadius * 1.35, this.dartRadius * 1.35, 1);
+    back.position.z = -0.02;
+    g.add(back);
+    const face = new THREE.Mesh(new THREE.CircleGeometry(this.dartRadius * 1.25, 64), new THREE.MeshBasicMaterial({ map: dartTexture(this.dartRadius * 1.25 / this.dartRadius) }));
+    face.position.z = 0.002;
+    g.add(face);
+    const plate = new THREE.Mesh(new THREE.PlaneGeometry(0.9, 0.22), toonMat(0xffffff, { map: signTexture('DART', 'Çizgiye bas, atışını yap') }));
+    plate.position.set(0, this.dartRadius * 1.35 + 0.16, 0);
+    g.add(plate);
+    this.group.add(g);
+    // yerdeki atış çizgisi
+    const line = new THREE.Mesh(new THREE.PlaneGeometry(0.08, 1.2), new THREE.MeshBasicMaterial({ color: 0xd9412b }));
+    line.rotation.x = -Math.PI / 2;
+    line.position.set(this.dartThrowPos.x + 0.3, 0.006, this.dartThrowPos.z);
+    this.group.add(line);
+    this.interactables.push({ id: 'dart', kind: 'dart', pos: this.dartThrowPos.clone(), radius: 1.4, label: 'Dart' });
   }
 
   private buildLights() {
@@ -669,6 +701,37 @@ function tavlaBoardTexture(): THREE.CanvasTexture {
   }
   for (let i = 0; i < 5; i++) { g.fillStyle = '#fff'; g.beginPath(); g.arc(20 + i * 6, 12 + i * 14, 8, 0, 7); g.fill(); }
   for (let i = 0; i < 5; i++) { g.fillStyle = '#222'; g.beginPath(); g.arc(230, 188 - i * 14, 8, 0, 7); g.fill(); }
+  const t = new THREE.CanvasTexture(c);
+  t.colorSpace = THREE.SRGBColorSpace;
+  return t;
+}
+
+/** Dart tahtası dokusu — puan geometrisi games/dart/dart.ts ile birebir aynı */
+function dartTexture(outerScale: number): THREE.CanvasTexture {
+  const N = 512, c = document.createElement('canvas');
+  c.width = c.height = N;
+  const g = c.getContext('2d')!;
+  const cx = N / 2, R = N / 2 / outerScale; // R = çift halkanın dış kenarı
+  const sectors = [20, 1, 18, 4, 13, 6, 10, 15, 2, 17, 3, 19, 7, 16, 8, 11, 14, 9, 12, 5];
+  g.fillStyle = '#1b1b1b'; g.fillRect(0, 0, N, N);
+  const ring = (r0: number, r1: number, colA: string, colB: string) => {
+    for (let i = 0; i < 20; i++) {
+      // tuval açısı: üst = -90°, saat yönünde
+      const a0 = -Math.PI / 2 + (i - 0.5) * (Math.PI / 10), a1 = a0 + Math.PI / 10;
+      g.beginPath(); g.arc(cx, cx, r1 * R, a0, a1); g.arc(cx, cx, r0 * R, a1, a0, true); g.closePath();
+      g.fillStyle = i % 2 ? colB : colA; g.fill();
+    }
+  };
+  ring(0.094, 0.582, '#1b1b1b', '#f4e7c8');
+  ring(0.582, 0.629, '#d62828', '#2f9e44');
+  ring(0.629, 0.953, '#1b1b1b', '#f4e7c8');
+  ring(0.953, 1.0, '#d62828', '#2f9e44');
+  g.fillStyle = '#2f9e44'; g.beginPath(); g.arc(cx, cx, 0.094 * R, 0, Math.PI * 2); g.fill();
+  g.fillStyle = '#d62828'; g.beginPath(); g.arc(cx, cx, 0.037 * R, 0, Math.PI * 2); g.fill();
+  g.strokeStyle = '#c0c0c0'; g.lineWidth = 1.5;
+  for (const r of [0.094, 0.582, 0.629, 0.953, 1]) { g.beginPath(); g.arc(cx, cx, r * R, 0, Math.PI * 2); g.stroke(); }
+  g.fillStyle = '#fff'; g.font = 'bold 26px Georgia'; g.textAlign = 'center'; g.textBaseline = 'middle';
+  sectors.forEach((s, i) => { const a = -Math.PI / 2 + i * (Math.PI / 10); g.fillText(String(s), cx + Math.cos(a) * 1.11 * R, cx + Math.sin(a) * 1.11 * R); });
   const t = new THREE.CanvasTexture(c);
   t.colorSpace = THREE.SRGBColorSpace;
   return t;

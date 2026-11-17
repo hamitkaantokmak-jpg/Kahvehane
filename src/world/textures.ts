@@ -114,8 +114,12 @@ export class TvScreen {
     this.t += dt;
     if (Math.floor(this.t * 8) !== Math.floor((this.t - dt) * 8)) { this.draw(); this.texture.needsUpdate = true; }
   }
+  /** Dış kaynak (ör. at yarışı) ekranı devralabilir */
+  overlay: ((g: CanvasRenderingContext2D, w: number, h: number, t: number) => void) | null = null;
+
   private draw() {
     const g = this.g; const t = this.t;
+    if (this.overlay) { this.overlay(g, 256, 192, t); return; }
     const W = 256, H = 192;
     if (this.channel === 0) {
       g.fillStyle = '#2f9e44'; g.fillRect(0, 0, W, H);
