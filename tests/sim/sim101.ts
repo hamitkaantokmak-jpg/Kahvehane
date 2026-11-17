@@ -3,7 +3,7 @@ import * as K from '../../src/games/okey101/okey101';
 import { decideDraw101, planTurn101 } from '../../src/games/okey101/okey101Bot';
 let fin = 0, opens = 0, pairsOpen = 0, deckOut = 0;
 const t0 = Date.now();
-const N = Number(process.env.N ?? 8);
+const N = Number((globalThis as any).process?.env?.N ?? 8);
 for (let seed = 1; seed <= N; seed++) {
   const rng = createRng(seed * 13);
   const s = K.newMatch101(rng, { hands: 1 }, seed % 4);
