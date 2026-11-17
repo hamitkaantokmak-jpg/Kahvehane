@@ -40,7 +40,7 @@ export interface BrawlConfig {
   joinRadius: number;
 }
 
-export const DEFAULT_BRAWL: BrawlConfig = { maxParticipants: 5, maxDuration: 14, joinRadius: 6 };
+export const DEFAULT_BRAWL: BrawlConfig = { maxParticipants: 5, maxDuration: 18, joinRadius: 6 };
 
 export interface BrawlState {
   a: string;

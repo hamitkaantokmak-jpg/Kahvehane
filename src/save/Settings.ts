@@ -7,6 +7,8 @@ export interface Settings {
   quality: 'low' | 'medium' | 'high';
   sensitivity: number;
   invertY: boolean;
+  /** Kaos yoğunluğu: Sakin / Normal / Tam kaos */
+  chaosIntensity: 'calm' | 'normal' | 'chaos';
 }
 
 export interface Stats {
@@ -21,7 +23,7 @@ const STATS_KEY = 'kahvehane.stats.v1';
 
 export const DEFAULT_SETTINGS: Settings = {
   master: 0.8, sfx: 0.9, ambience: 0.5, muted: false,
-  quality: matchMediaSafe('(pointer: coarse)') ? 'low' : 'high', sensitivity: 1, invertY: false,
+  quality: matchMediaSafe('(pointer: coarse)') ? 'low' : 'high', sensitivity: 1, invertY: false, chaosIntensity: 'normal',
 };
 
 function matchMediaSafe(q: string) {

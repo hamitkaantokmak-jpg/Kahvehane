@@ -19,6 +19,9 @@ import { sfx } from '../audio/Sfx';
 import { loadSettings, saveSettings, Settings, loadStats, saveStats, Stats } from '../save/Settings';
 import { TableSession } from '../tables/TableSession';
 import { OcclusionFader } from '../player/OcclusionFader';
+import { ChaosDirector } from '../chaos/ChaosDirector';
+import { BrawlController } from '../npc/BrawlController';
+import { createRng, Rng } from '../games/common/rng';
 
 export class Game {
   readonly renderer: THREE.WebGLRenderer;
@@ -39,6 +42,11 @@ export class Game {
   settings: Settings;
   stats: Stats;
   mode: 'explore' | 'seated' = 'explore';
+  /** Oyun katmanı rastgeleliği (saf modüllere enjekte edilir) */
+  readonly rng: Rng = createRng((performance.now() * 1000) >>> 0);
+  chaos!: ChaosDirector;
+  brawls!: BrawlController;
+  private overflowCooldown = 0;
   session: TableSession | null = null;
   private clock = new THREE.Clock();
   private frustum = new THREE.Frustum();
@@ -100,6 +108,10 @@ export class Game {
       this.hud.toast('Çayın geldi! 7 ile iç.');
     };
     this.world.onPlayerBonked = (by) => this.social.playerBonked(by);
+    this.chaos = new ChaosDirector(this.rng, this.settings.chaosIntensity);
+    this.chaos.available = new Set(['brawl']);
+    this.world.onTension = (src) => this.chaos.add(src);
+    this.world.requestBrawl = (a, b) => this.brawls.start(a, b);
 
     // NPC'ler
     const spawns: [number, number][] = [[-2, 0], [3, -0.5], [-6, -1], [-6.8, -4.6], [6, 4], [-1.5, -5.2], [4, 4.5]];
@@ -121,6 +133,10 @@ export class Game {
     this.social = new Social(this.player, this.npcs, this.effects, this.rig, this.world, (m) => this.hud.toast(m));
     this.hud.onEmote = (id) => this.social.emote(id);
     this.hud.onSettings = (s) => this.applySettings(s);
+    this.brawls = new BrawlController(this.world, this.chaos, this.rng, {
+      playerBonked: (by) => this.social.playerBonked(by),
+      toast: (m) => this.hud.toast(m),
+    });
     this.hud.onResume = () => this.togglePause(false);
 
     this.applySettings(this.settings);
@@ -149,6 +165,7 @@ export class Game {
 
   applySettings(s: Settings) {
     this.settings = s;
+    this.chaos?.setIntensity(s.chaosIntensity);
     saveSettings(s);
     sfx.settings = { master: s.master, sfx: s.sfx, ambience: s.ambience, muted: s.muted };
     sfx.applySettings();
@@ -215,6 +232,7 @@ export class Game {
         c.update(dt, this.kahve.collision, all, animate);
       }
       this.kahve.update(dt);
+      this.updateChaos(dt);
       this.effects.update(dt);
     }
     const look = this.input.consumeLook();
@@ -224,6 +242,34 @@ export class Game {
     if (this.mode === 'explore') this.fader.update(this.camera.position, follow); else this.fader.update(null, follow);
     this.bubbles.update();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  private updateChaos(dt: number) {
+    const u = this.chaos.update(dt);
+    if (u.event?.id === 'brawl') this.startDirectorBrawl();
+    this.brawls.update(dt);
+    this.overflowCooldown -= dt;
+    if (u.overflow && this.overflowCooldown <= 0) {
+      this.overflowCooldown = 20;
+      this.hud.flashWarning('⚠️ KAHVEHANE KARIŞTI! Şükrü koş!');
+    }
+    this.hud.setTension(this.chaos.tension, this.chaos.level);
+  }
+
+  /** Direktörün kavga olayı: müsait iki rakip NPC birbirine girer (yoksa en sinirli iki kişi). */
+  startDirectorBrawl(): boolean {
+    const free = this.npcs.filter((n) => n.id !== 'sukru' && !n.inBrawl && ['idle', 'seated', 'tv', 'wander', 'chat', 'bench'].includes(n.mode));
+    const pairs: [typeof free[0], typeof free[0]][] = [];
+    for (const a of free) for (const b of free) if (a !== b && a.p.rivals.includes(b.id)) pairs.push([a, b]);
+    let pair = pairs.length ? pairs[Math.floor(this.rng() * pairs.length)] : null;
+    if (!pair && free.length >= 2) {
+      const hot = [...free].sort((x, y) => y.p.temper - x.p.temper);
+      pair = [hot[0], hot[1]];
+    }
+    if (!pair) return false;
+    const [a, b] = pair;
+    a.c.say(pickLine(a.p.lines.laf), 2.5);
+    return this.brawls.start(a.id, b.id);
   }
 
   private handleAction(a: string) {

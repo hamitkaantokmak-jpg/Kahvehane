@@ -55,6 +55,8 @@ export class OkeyUI implements GameUI {
   private pump() {
     if (!this.alive || this.s.phase === 'ended') return;
     if (this.host.isHuman(this.s.current)) return;
+    // masadan kalkan (kavgadaki) oyuncu varsa bot sırası bekler
+    if (this.host.paused) { clearTimeout(this.botTimer); this.botTimer = later(() => this.pump(), 600); return; }
     clearTimeout(this.botTimer);
     const p = this.s.current;
     if (Math.random() < 0.25) this.host.react(p, 'think');

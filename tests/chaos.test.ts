@@ -159,7 +159,7 @@ describe('Zincirleme kavga', () => {
   it('kavga süre dolunca, yorulunca ya da yatıştırılınca söner', () => {
     const b = new Brawl('a', 'b');
     expect(b.update(5)).toBe(false);
-    expect(b.update(10)).toBe(true);
+    expect(b.update(14)).toBe(true);
     expect(b.state.endReason).toBe('timeout');
     const b2 = new Brawl('a', 'b');
     for (let i = 0; i < 4; i++) { b2.registerHit('a'); b2.registerHit('b'); }

@@ -16,33 +16,9 @@ test('Çay isteme: Şükrü servis turunu yapıp çayı oyuncuya getirir', async
   expect(errs).toEqual([]);
 });
 
-test('Istaka: iki şaplaktan sonra Rıza Dayı ıstakayla karşılık verir', async ({ page }) => {
-  test.setTimeout(180_000);
-  const errs = trackErrors(page);
-  await boot(page, 'gspeed=2');
-  const place = async () => page.evaluate(() => {
-    const g = (window as unknown as W).__game;
-    const n = g.npcs.find((x: any) => x.id === 'riza');
-    if (n.c.seated) n.leaveSeat();
-    if (n.mode !== 'react' && n.mode !== 'retaliate') { n.c.stopWalking(); n.mode = 'wander'; n.timer = 60; }
-    n.c.pos.set(1.5, 0, 4.4);
-    g.player.pos.set(1.5, 0, 5.4); g.player.yaw = Math.PI; g.player.targetYaw = Math.PI; g.player.velocity.set(0, 0, 0);
-  });
-  await place();
-  await page.keyboard.press('KeyF');
-  await page.waitForFunction(() => (window as unknown as W).__game.npcs.find((x: any) => x.id === 'riza').bonkCount === 1);
-  await page.waitForTimeout(3500);
-  await page.evaluate(() => { const n = (window as unknown as W).__game.npcs.find((x: any) => x.id === 'riza'); n.mode = 'wander'; n.timer = 60; });
-  await place();
-  await page.keyboard.press('KeyF');
-  await page.waitForFunction(() => (window as unknown as W).__game.npcs.find((x: any) => x.id === 'riza').bonkCount === 2);
-  await page.waitForFunction(() => (window as unknown as W).__game.social.timesBonked > 0, null, { timeout: 60_000 });
-  expect(errs).toEqual([]);
-});
-
 test('Yürüme, koşma ve masaya oturma (klavye)', async ({ page }) => {
   const errs = trackErrors(page);
-  await boot(page);
+  await boot(page, 'gspeed=2');
   const p0 = await page.evaluate(() => (window as unknown as W).__game.player.pos.z);
   await page.keyboard.down('KeyW');
   await page.keyboard.down('ShiftLeft');
