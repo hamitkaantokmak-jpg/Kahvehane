@@ -188,10 +188,11 @@ export class NPC {
     if (this.serveStage === 1) {
       this.timer -= dt;
       if (this.timer <= 0) {
+        const fromQueue = this.w.teaRequests.length > 0;
         this.serveTarget = this.pickServeTarget();
         if (!this.serveTarget) { this.serveStage = 0; this.mode = 'idle'; this.timer = 3; return; }
-        // bazen siparişi karıştırır
-        this.wrongOrder = Math.random() < 0.2 && this.w.teaRequests.length === 0;
+        // bazen siparişi karıştırır — yalnızca kendi kafasına göre dağıttığı çaylarda (ödenmiş siparişlerde asla)
+        this.wrongOrder = !fromQueue && Math.random() < 0.2;
         if (this.wrongOrder) {
           const alts = this.w.npcs.filter((n) => n !== this && n.c !== this.serveTarget && n.mode !== 'walking').map((n) => n.c);
           if (alts.length) this.serveTarget = alts[Math.floor(Math.random() * alts.length)];
