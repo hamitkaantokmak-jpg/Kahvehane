@@ -21,6 +21,7 @@ import { TableSession } from '../tables/TableSession';
 import { DartSession } from '../tables/DartSession';
 import { HorseRaceTV } from '../world/HorseRaceTV';
 import { ChaosEvents } from '../world/ChaosEvents';
+import { VoicePlayer } from '../audio/Voice';
 import { OcclusionFader } from '../player/OcclusionFader';
 import { ChaosDirector } from '../chaos/ChaosDirector';
 import { BrawlController } from '../npc/BrawlController';
@@ -57,6 +58,7 @@ export class Game {
   economy!: EconomyController;
   race!: HorseRaceTV;
   chaosEvents!: ChaosEvents;
+  voice!: VoicePlayer;
   private teaseT = 20;
   private raiseT = 90;
   session: TableSession | DartSession | null = null;
@@ -151,6 +153,14 @@ export class Game {
     this.social.economy = this.economy;
     this.race = new HorseRaceTV(this);
     this.chaosEvents = new ChaosEvents(this);
+    // NPC sesleri (Aşama 6): balon çıkınca kişiye özgü mırıltı + ağız hareketi
+    this.voice = new VoicePlayer(() => sfx.voiceOutput(), this.rng, (id) => [this.player, ...this.npcs.map((n) => n.c)].find((c) => c.id === id)?.spec.voicePitch ?? 1);
+    this.voice.enabled = this.settings.npcVoices;
+    this.bubbles.onSay = (c, text, seconds) => {
+      const head = c.headWorld();
+      const dur = this.voice.speak(c.id, text, head, this.camera.position, this.clockTime);
+      c.anim.speak(dur > 0 ? dur : Math.min(seconds * 0.6, 0.4 + text.length * 0.05));
+    };
     this.social.now = () => this.clockTime;
     // çay fırlatma (Aşama 3)
     this.social.teaEnabled = () => this.settings.teaThrow !== 'off';
@@ -194,6 +204,7 @@ export class Game {
   applySettings(s: Settings) {
     this.settings = s;
     this.chaos?.setIntensity(s.chaosIntensity);
+    if (this.voice) this.voice.enabled = s.npcVoices;
     saveSettings(s);
     sfx.settings = { master: s.master, sfx: s.sfx, ambience: s.ambience, muted: s.muted };
     sfx.applySettings();
@@ -273,6 +284,11 @@ export class Game {
     this.rig.update(dt, follow);
     if (this.mode === 'explore') this.fader.update(this.camera.position, follow); else this.fader.update(null, follow);
     this.bubbles.update();
+    if (this.voice) {
+      const fwd = new THREE.Vector3();
+      this.camera.getWorldDirection(fwd);
+      this.voice.setListener(this.camera.position, fwd);
+    }
     this.renderer.render(this.scene, this.camera);
   }
 
