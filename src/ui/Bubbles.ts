@@ -39,6 +39,8 @@ export class Bubbles implements BubbleHost {
       this.v.project(this.camera);
       if (this.v.z > 1 || this.v.z < -1) { b.el.style.display = 'none'; continue; }
       b.el.style.display = 'block';
+      const sx = ((this.v.x + 1) / 2) * w, sy = ((1 - this.v.y) / 2) * h;
+      if (sx < -w * 0.15 || sx > w * 1.15 || sy < -h * 0.2 || sy > h * 1.1) { b.el.style.display = 'none'; continue; }
       const bw = b.el.offsetWidth, bh = b.el.offsetHeight;
       const x = Math.max(bw / 2 + 4, Math.min(w - bw / 2 - 4, ((this.v.x + 1) / 2) * w));
       const y = Math.max(bh + 4, Math.min(h - 4, ((1 - this.v.y) / 2) * h));
