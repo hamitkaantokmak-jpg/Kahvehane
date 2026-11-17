@@ -121,7 +121,10 @@ export class Character {
     this.knockVel.copy(dir).setY(0).normalize().multiplyScalar(strength);
   }
 
-  update(dt: number, world?: CollisionWorld, others: Character[] = []) {
+  private animDt = 0;
+
+  /** animate=false: animasyon güncellemesi ertelenir (ekran dışı karakterler, düşük kalite) */
+  update(dt: number, world?: CollisionWorld, others: Character[] = [], animate = true) {
     // yol takibi
     let speed = 0;
     if (this.path.length && !this.seated && !this.anim.isIncapacitated()) {
@@ -164,6 +167,7 @@ export class Character {
     }
     this.model.root.rotation.y = this.yaw;
     this.anim.speed += (speed - this.anim.speed) * Math.min(1, dt * 10);
-    this.anim.update(dt);
+    this.animDt += dt;
+    if (animate) { this.anim.update(Math.min(this.animDt, 0.2)); this.animDt = 0; }
   }
 }

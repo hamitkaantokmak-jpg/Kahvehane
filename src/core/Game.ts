@@ -41,6 +41,11 @@ export class Game {
   mode: 'explore' | 'seated' = 'explore';
   session: TableSession | null = null;
   private clock = new THREE.Clock();
+  private frustum = new THREE.Frustum();
+  private projScreen = new THREE.Matrix4();
+  private sphere = new THREE.Sphere(new THREE.Vector3(), 1.3);
+  /** ölçüm: atlanan animasyon güncellemesi sayısı */
+  animSkipped = 0;
   fader!: OcclusionFader;
   private focus: Interactable | null = null;
   private stepT = 0;
@@ -197,7 +202,18 @@ export class Game {
       else this.session?.update(dt);
       const all = [this.player, ...this.npcs.map((n) => n.c)];
       for (const n of this.npcs) n.update(dt);
-      for (const c of all) c.update(dt, this.kahve.collision, all);
+      // düşük kalitede ekran dışındaki karakterlerin animasyonu 4 karede bir güncellenir
+      const throttle = this.settings.quality === 'low';
+      if (throttle) { this.camera.updateMatrixWorld(); this.projScreen.multiplyMatrices(this.camera.projectionMatrix, this.camera.matrixWorldInverse); this.frustum.setFromProjectionMatrix(this.projScreen); }
+      for (const c of all) {
+        let animate = true;
+        if (throttle && c !== this.player) {
+          this.sphere.center.copy(c.pos).setY(1);
+          animate = this.frustum.intersectsSphere(this.sphere) || this.frame % 4 === 0;
+          this.animSkipped += animate ? 0 : 1;
+        }
+        c.update(dt, this.kahve.collision, all, animate);
+      }
       this.kahve.update(dt);
       this.effects.update(dt);
     }
