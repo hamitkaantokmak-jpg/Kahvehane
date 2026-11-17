@@ -3,7 +3,7 @@
  */
 export type SfxName =
   | 'glass' | 'tile' | 'dice' | 'card' | 'deal' | 'chair' | 'laugh' | 'bonk' | 'slap' | 'whoosh' | 'pop'
-  | 'coin' | 'grunt' | 'angry' | 'surprise' | 'win' | 'lose' | 'pisti' | 'click' | 'clap' | 'tableSlam' | 'pour' | 'snore' | 'tvChannel' | 'step';
+  | 'coin' | 'glassBreak' | 'splash' | 'grunt' | 'angry' | 'surprise' | 'win' | 'lose' | 'pisti' | 'click' | 'clap' | 'tableSlam' | 'pour' | 'snore' | 'tvChannel' | 'step';
 
 export interface AudioSettings { master: number; sfx: number; ambience: number; muted: boolean }
 
@@ -171,6 +171,14 @@ export class Sfx {
       case 'coin':
         [1568, 2093, 2637].forEach((f, i) => this.tone(f * r(), 0.12, 'triangle', 0.12, i * 0.07));
         this.noise(0.05, 6000, 2, 'bandpass', 0.15, 0.03);
+        break;
+      case 'glassBreak':
+        for (let i = 0; i < 7; i++) this.tone(2400 + Math.random() * 3200, 0.12 + Math.random() * 0.15, 'triangle', 0.08, i * 0.025 + Math.random() * 0.02);
+        this.noise(0.25, 5500, 0.7, 'highpass', 0.35);
+        break;
+      case 'splash':
+        this.noise(0.35, 900, 1.2, 'bandpass', 0.45, 0, 0.01);
+        this.noise(0.5, 2500, 0.8, 'lowpass', 0.15, 0.08, 0.03);
         break;
       case 'click':
         this.tone(1200, 0.04, 'square', 0.05);

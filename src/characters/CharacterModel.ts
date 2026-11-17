@@ -42,6 +42,11 @@ export class CharacterModel {
   readonly blush: THREE.Mesh[] = [];
   readonly blushMat: THREE.MeshBasicMaterial;
   readonly pupils: THREE.Mesh[] = [];
+  /** Çaylı yüz katmanı (leke + damlalar) */
+  readonly stain = new THREE.Group();
+  private stainMat: THREE.MeshToonMaterial;
+  private drips: THREE.Mesh[] = [];
+  private stainK = -1;
   readonly eyes: THREE.Group[] = [];
   readonly brows: THREE.Mesh[] = [];
   readonly mustache = new THREE.Group();
@@ -270,6 +275,33 @@ export class CharacterModel {
     this.legL = mkLeg(1);
     this.legR = mkLeg(-1);
 
+    // çaylı yüz: alın/yanak/saç lekeleri + süzülen damlalar (karaktere özel yarı saydam toon materyal)
+    this.stainMat = new THREE.MeshToonMaterial({ color: 0x5c2a08, transparent: true, opacity: 0, depthWrite: false });
+    const blob = sharedGeo('stainBlob', () => new THREE.SphereGeometry(1, 10, 8));
+    const blobs: [number, number, number, number, number][] = [
+      [0.15, 0.45, 0.82, 0.32, 0.16], [-0.3, 0.25, 0.86, 0.22, 0.14], [0.42, -0.05, 0.8, 0.2, 0.16],
+      [-0.1, 0.78, 0.45, 0.42, 0.18], [0.05, -0.2, 0.95, 0.14, 0.1],
+    ];
+    for (const [x, y, z, sx, sy] of blobs) {
+      const m = new THREE.Mesh(blob, this.stainMat);
+      m.position.set(x * hr * hs[0], y * hr * hs[1], z * faceZ);
+      m.scale.set(sx * hr, sy * hr, 0.06 * hr);
+      m.lookAt(m.position.clone().multiplyScalar(2));
+      m.userData.keep = true;
+      m.renderOrder = 3;
+      this.stain.add(m);
+    }
+    for (let i = 0; i < 4; i++) {
+      const d = new THREE.Mesh(blob, this.stainMat);
+      d.scale.set(hr * 0.045, hr * 0.07, hr * 0.045);
+      d.userData = { keep: true, x: (i - 1.5) * hr * 0.35, phase: i * 0.27 };
+      d.renderOrder = 3;
+      this.stain.add(d);
+      this.drips.push(d);
+    }
+    this.stain.visible = false;
+    this.head.add(this.stain);
+    this.faceZ = faceZ;
     this.mouth.userData.keep = true;
     this.smile.userData.keep = true;
     for (const b of this.blush) b.userData.keep = true;
@@ -287,6 +319,22 @@ export class CharacterModel {
     this.blush.forEach((b) => (b.castShadow = false));
     this.smile.castShadow = false;
     this.headTopY = (legLen + torsoH * 0.95 + 0.1 + hr * 0.85 + hr * hs[1] + 0.08) * s.height;
+  }
+
+  private faceZ = 0;
+
+  /** Çaylı yüz yoğunluğu (0 = temiz). `t` damla animasyonu için süre. */
+  setStain(k: number, t: number) {
+    if (k <= 0) { if (this.stainK !== 0) { this.stain.visible = false; this.stainK = 0; } return; }
+    this.stain.visible = true;
+    this.stainK = k;
+    this.stainMat.opacity = 0.92 * k;
+    const hr = this.spec.headSize;
+    for (const d of this.drips) {
+      const p = (t * 0.45 + d.userData.phase) % 1;
+      d.position.set(d.userData.x, hr * (0.15 - p * 1.25), this.faceZ * (0.9 - p * 0.15));
+      d.visible = p < 0.92;
+    }
   }
 
   setHeldProp(obj: THREE.Object3D | null) {

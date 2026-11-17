@@ -198,11 +198,28 @@ export class TableSession implements GameHost {
     const ui = this.createUI(gid);
     this.ui = ui;
     this.root.appendChild(ui.el);
+    this.addThrowButton();
     this.settledGames.clear();
     if (this.options.stake > 0) {
       this.game.hud.toast(`💰 Bahisli masa: kaybeden ${this.options.stake} çay (${stakeCoins(this.options.stake)}🪙) öder.`, 3.5);
       setTimeout(() => this.offerRaise(), 1800);
     }
+  }
+
+  /** Masada çay fırlatma: yalnızca görsel/sosyal, oyunu etkilemez */
+  private addThrowButton() {
+    if (this.game.settings.teaThrow === 'off') return;
+    const b = btn('💦 Çay fırlat', 'small throw-btn', () => {
+      const old = this.root.querySelector('.throw-pick');
+      if (old) { old.remove(); return; }
+      const pick = h('div', 'throw-pick');
+      for (const p of this.participants) {
+        if (p === 'player') continue;
+        pick.appendChild(btn(`→ ${p.c.name}`, 'small', () => { pick.remove(); this.game.social.throwTea(p); }));
+      }
+      this.root.appendChild(pick);
+    });
+    this.root.appendChild(b);
   }
 
   /** Bahsi artırmaya meyilli bir NPC (ör. Cemal) iki katına çıkarmayı teklif eder */

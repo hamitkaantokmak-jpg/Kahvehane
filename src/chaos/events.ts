@@ -34,6 +34,7 @@ export const TENSION_POINTS = {
   tableFlip: 25,
   cat: 15,
   glassBreak: 3,
+  teaSplash: 6,
   calmDown: -30,
 } as const;
 export type TensionSource = keyof typeof TENSION_POINTS;

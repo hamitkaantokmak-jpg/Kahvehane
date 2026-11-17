@@ -12,8 +12,10 @@ import type { CameraRig } from '../player/CameraRig';
 import { sfx } from '../audio/Sfx';
 import { pickLine, SUKRU_LINES } from '../npc/personalities';
 import type { EconomyController } from '../economy/EconomyController';
+import { newThrowState, throwCost, canThrow, recordThrow, updateThrows, splash, wipe, isStained } from '../interactions/teaThrow';
+import { HOUSE, playerPay, price, balanceOf } from '../economy/Economy';
 
-export type EmoteId = 'wave' | 'laugh' | 'clap' | 'bellyDance' | 'slamTable' | 'laf' | 'drink';
+export type EmoteId = 'wave' | 'laugh' | 'clap' | 'bellyDance' | 'slamTable' | 'laf' | 'drink' | 'wipe';
 
 export const EMOTES: { id: EmoteId; label: string; key: string; icon: string }[] = [
   { id: 'wave', label: 'Selam ver', key: '1', icon: '👋' },
@@ -23,6 +25,7 @@ export const EMOTES: { id: EmoteId; label: string; key: string; icon: string }[]
   { id: 'slamTable', label: 'Masaya vur', key: '5', icon: '✊' },
   { id: 'laf', label: 'Laf at', key: '6', icon: '🗯️' },
   { id: 'drink', label: 'Çay iç', key: '7', icon: '🍵' },
+  { id: 'wipe', label: 'Yüzünü sil', key: '8', icon: '🧻' },
 ];
 
 const LAF_LINES = [
@@ -40,6 +43,10 @@ export class Social {
 
   /** Ekonomi (Aşama 2): çay parası, veresiye */
   economy: EconomyController | null = null;
+  /** Çay fırlatma (Aşama 3) */
+  readonly throwState = newThrowState();
+  teaEnabled: () => boolean = () => true;
+  private npcThrowCd = new Map<string, number>();
 
   constructor(
     private player: Character,
@@ -160,6 +167,12 @@ export class Social {
         } else p.say('Kimse yok ki laf atayım...', 2);
         break;
       }
+      case 'wipe':
+        if (!isStained(p.stain)) { this.toast('Yüzün zaten tertemiz.'); p.anim.play('shrug'); return; }
+        p.anim.play('facepalm');
+        sfx.play('pop');
+        setTimeout(() => { wipe(p.stain); p.say(pickLine(['Peçete nerede be...', 'Tamam, temizlendi.', 'Çay kokuyorum hâlâ.']), 2); }, 900);
+        break;
       case 'drink':
         if (!this.playerHasTea) { this.toast('Elinde çay yok. Semavere git ya da T ile Şükrü\'den iste.'); p.anim.play('shrug'); return; }
         p.anim.play('drink');
@@ -210,6 +223,73 @@ export class Social {
     this.player.say(forOther ? `Şükrü! ${forOther.c.name}'ya bir çay!` : 'Şükrü! Bir çay!', 2);
     sfx.play('pop');
     setTimeout(() => sukru.c.say(pickLine(['Geliyor abi!', 'Hemen abi!', 'Taze demledim, geliyor!']), 2), 900);
+  }
+
+  update(dt: number) {
+    updateThrows(this.throwState, dt);
+    for (const [k, v] of this.npcThrowCd) this.npcThrowCd.set(k, v - dt);
+  }
+
+  /** Oyuncu çay fırlatır (hedef verilmezse önündeki en yakın kişi). Başarılıysa true. */
+  throwTea(target?: NPC): boolean {
+    if (!this.teaEnabled()) { this.toast('Çay fırlatma ayarlardan kapalı.'); return false; }
+    if (!canThrow(this.throwState)) { this.toast(`Biraz bekle... (${Math.ceil(this.throwState.cooldown)} sn)`); return false; }
+    const t = target ?? this.targetInFront(4.5, 0.75) ?? this.nearestNpc(4.5);
+    if (!t) { this.toast('Çay fırlatacak kimse yok.'); return false; }
+    const holding = this.playerHasTea;
+    if (this.economy) {
+      const s = this.economy.s;
+      const cost = throwCost(this.throwState, t.id, { tea: price(s, 'tea'), brokenGlass: price(s, 'brokenGlass') }, holding);
+      const r = this.economy.tx((st) => playerPay(st, HOUSE, cost, true));
+      if (!r.ok) { this.toast('Veresiye defteri dolu: çay fırlatamazsın! Önce borcunu öde.'); return false; }
+      this.toast(`☕💥 ${t.c.name}'a çay! (${cost}🪙${r.onCredit ? `, ${r.onCredit}🪙 veresiye` : ''})`);
+    }
+    recordThrow(this.throwState, t.id);
+    if (holding) this.setPlayerTea(false);
+    this.launch(this.player, t.c, () => t.onTeaSplashed(this.player));
+    return true;
+  }
+
+  /** NPC karşılık olarak çay fırlatır; bedeli kendi cüzdanından öder (parası yoksa sadece söylenir). */
+  npcThrowTea(npc: NPC, target: Character): boolean {
+    if (!this.teaEnabled() || (this.npcThrowCd.get(npc.id) ?? 0) > 0) return false;
+    if (this.economy) {
+      const s = this.economy.s;
+      const cost = price(s, 'tea') + price(s, 'brokenGlass');
+      if (balanceOf(s, npc.id) < cost) { npc.c.say('Param olsa sana bir çay atardım!', 2.5); return false; }
+      this.economy.tx((st) => { st.balances[npc.id] = balanceOf(st, npc.id) - cost; });
+    }
+    this.npcThrowCd.set(npc.id, 6);
+    this.launch(npc.c, target, () => {
+      if (target === this.player) this.playerSplashed(npc.c);
+      else this.npcs.find((n) => n.c === target)?.onTeaSplashed(npc.c);
+    });
+    return true;
+  }
+
+  private launch(from: Character, to: Character, onHit: () => void) {
+    from.faceTowards(to.pos);
+    from.anim.play('swing');
+    sfx.play('whoosh');
+    const start = new THREE.Vector3();
+    from.model.handPropR.getWorldPosition(start);
+    this.effects.teaProjectile(start, () => to.headWorld(), () => {
+      const head = to.headWorld();
+      sfx.play('glassBreak');
+      sfx.play('splash');
+      this.effects.teaSplash(head);
+      splash(to.stain);
+      to.anim.play('surprise');
+      to.anim.hitImpulse(0.8);
+      onHit();
+    }, makeTeaGlass(false));
+  }
+
+  /** Oyuncuya çay isabet etti */
+  onPlayerSplashed: (by: Character) => void = () => {};
+  private playerSplashed(by: Character) {
+    this.player.say(pickLine(['Aaa! Gözüm!', 'Sıcak sıcak!', 'Gömleğim gitti!']), 2);
+    this.onPlayerSplashed(by);
   }
 
   /** Oyuncu vurulunca (misilleme) */
