@@ -1,4 +1,8 @@
 /** Shared contracts between rule engines, bots and UIs. */
+/** Bot zorluk seviyesi */
+export type Difficulty = 'easy' | 'medium' | 'hard';
+export const DIFFICULTY_TR: Record<Difficulty, string> = { easy: 'Kolay', medium: 'Orta', hard: 'Zor' };
+
 export type GameId = 'okey' | 'okey101' | 'tavla' | 'pisti2' | 'pisti4';
 
 export interface GameMeta {

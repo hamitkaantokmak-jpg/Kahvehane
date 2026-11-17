@@ -1,6 +1,6 @@
 /** 101 Okey arayüzü: per hazırlama (seri/çift), el açma, masaya per serme, taş işleme, ceza uyarıları, seri maç. */
 import * as K from '../../games/okey101/okey101';
-import { decideDraw101, planTurn101 } from '../../games/okey101/okey101Bot';
+import { decideDraw101, stepTurn101 } from '../../games/okey101/okey101Bot';
 import { createRng } from '../../games/common/rng';
 import { Tile, isJoker, isPair } from '../../games/common/tiles';
 import { GameHost, GameUI } from '../../tables/TableSession';
@@ -66,18 +66,15 @@ export class Okey101UI implements GameUI {
     const s = this.s;
     try {
       if (s.phase === 'draw') {
-        const d = decideDraw101(K.view101(s, p));
+        const d = decideDraw101(K.view101(s, p), this.host.difficulty);
         if (d === 'discard') K.drawDiscard101(s, p); else K.drawDeck101(s, p);
         this.host.sfx('tile');
         this.render();
       }
-      let plan = planTurn101(K.view101(s, p), this.rng);
-      if (plan.length === 0) {
-        K.returnDiscard101(s, p);
-        K.drawDeck101(s, p);
-        plan = planTurn101(K.view101(s, p), this.rng);
-      }
-      for (const a of plan) {
+      // her eylemden sonra yeniden planla (aynı tur serilen perlere de işleyebilsin)
+      for (let step = 0; step < 40 && s.current === p && s.phase === 'play'; step++) {
+        const a = stepTurn101(K.view101(s, p), this.rng, this.host.difficulty);
+        if (!a) { K.returnDiscard101(s, p); K.drawDeck101(s, p); continue; }
         await new Promise<void>((r) => (this.botTimer = later(() => r(), 650)));
         if (!this.alive) return;
         if (a.type === 'open') {
@@ -92,7 +89,7 @@ export class Okey101UI implements GameUI {
           if (r.penalty) this.host.react(p, 'angry', 'Eyvah, ceza yedim!');
         }
         this.render();
-        if (s.phase === 'ended') break;
+        if ((s.phase as string) === 'ended') break;
       }
     } catch (e) {
       console.warn('101 bot hatası', e);

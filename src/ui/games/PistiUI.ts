@@ -66,7 +66,7 @@ export class PistiUI implements GameUI {
   private pump() {
     if (!this.alive || this.s.phase !== 'play' || this.host.isHuman(this.s.current)) return;
     const p = this.s.current;
-    this.timer = later(() => this.play(p, choosePistiCard(P.viewPisti(this.s, p), this.rng)), 750 + Math.random() * 500);
+    this.timer = later(() => this.play(p, choosePistiCard(P.viewPisti(this.s, p), this.rng, this.host.difficulty)), 750 + Math.random() * 500);
   }
 
   private play(p: number, cardId: number) {

@@ -3,6 +3,7 @@
  */
 import { Tile, OkeyCtx, toCounts, bestPartition, isJoker, identity, Counts } from '../common/tiles';
 import { OKEY_RULES, OkeyView, evaluateFinish } from './okey';
+import type { Difficulty } from '../common/types';
 
 export type OkeyBotAction =
   | { type: 'drawDeck' }
@@ -43,9 +44,35 @@ export function evaluateHand(tiles: Tile[], ctx: OkeyCtx): number {
   return Math.max(meldScore, pairScore);
 }
 
-function bestDiscard(hand: Tile[], ctx: OkeyCtx, rng: () => number): { tile: Tile; score: number } {
+/**
+ * Sağdaki (sonraki) oyuncuya bu taşın işe yarama riski — yalnızca açık bilgiden:
+ * sonraki oyuncunun yerden aldığı taşlar (ilgi) ve kendi attığı taşlar (ilgisizlik).
+ */
+export function feedDanger(t: Tile, view: OkeyView): number {
+  const next = (view.me + 1) % 4;
+  const ctx = view.ctx;
+  const id = identity(t, ctx);
+  let d = 0;
+  for (const tk of view.takes) {
+    if (tk.player !== next || isJoker(tk.tile, ctx)) continue;
+    const o = identity(tk.tile, ctx);
+    if (o.color === id.color && Math.abs(o.num - id.num) <= 2 && o.num !== id.num) d += 3;
+    if (o.num === id.num && o.color !== id.color) d += 2.5;
+  }
+  for (const dt of view.discardHistory[next] ?? []) {
+    if (isJoker(dt, ctx)) continue;
+    const o = identity(dt, ctx);
+    if (o.color === id.color && Math.abs(o.num - id.num) <= 1) d -= 1;
+    if (o.num === id.num) d -= 1;
+  }
+  // aynı taşın iki kopyası da görünürdeyse (yerlerde) o taş "ölü": seri tamamlama şansı düşük
+  return d;
+}
+
+function bestDiscard(hand: Tile[], ctx: OkeyCtx, rng: () => number, view?: OkeyView, diff: Difficulty = 'medium'): { tile: Tile; score: number } {
   let best: { tile: Tile; score: number } | null = null;
   const seen = new Set<string>();
+  const noise = diff === 'easy' ? 12 : diff === 'medium' ? 0.5 : 0.2;
   for (const t of hand) {
     if (isJoker(t, ctx)) continue;
     const id = identity(t, ctx);
@@ -53,15 +80,15 @@ function bestDiscard(hand: Tile[], ctx: OkeyCtx, rng: () => number): { tile: Til
     if (seen.has(key)) continue;
     seen.add(key);
     const rest = hand.filter((x) => x !== t);
-    // küçük rastgelelik + yüksek sayıları atmayı hafif tercih
-    const score = evaluateHand(rest, ctx) + rng() * 0.5 + id.num * 0.01;
+    let score = evaluateHand(rest, ctx) + rng() * noise + id.num * 0.01;
+    if (diff === 'hard' && view) score -= feedDanger(t, view) * 1.6;
     if (!best || score > best.score) best = { tile: t, score };
   }
   if (!best) best = { tile: hand[0], score: -1 };
   return best;
 }
 
-export function decideOkey(view: OkeyView, rng: () => number = Math.random): OkeyBotAction {
+export function decideOkey(view: OkeyView, rng: () => number = Math.random, diff: Difficulty = 'medium'): OkeyBotAction {
   const { hand, ctx } = view;
   if (view.phase === 'draw') {
     const top = view.discardTops[(view.me + 3) % 4];
@@ -71,7 +98,7 @@ export function decideOkey(view: OkeyView, rng: () => number = Math.random): Oke
         if (t.id === top.id) continue;
         if (evaluateFinish(withTop.filter((x) => x !== t), ctx)) return { type: 'drawDiscard' };
       }
-      if (isJoker(top, ctx)) return { type: 'drawDiscard' };
+      if (isJoker(top, ctx) && diff !== 'easy') return { type: 'drawDiscard' };
       const now = evaluateHand(hand, ctx);
       // alınan taşı tutup başka bir taş atınca el ne kadar iyileşiyor?
       let bestWith = -Infinity;
@@ -80,7 +107,8 @@ export function decideOkey(view: OkeyView, rng: () => number = Math.random): Oke
         const sc = evaluateHand(withTop.filter((x) => x !== t), ctx);
         if (sc > bestWith) bestWith = sc;
       }
-      if (bestWith >= now + 9) return { type: 'drawDiscard' };
+      const need = diff === 'easy' ? 20 : diff === 'hard' ? 7 : 9;
+      if (bestWith >= now + need) return { type: 'drawDiscard' };
     }
     return { type: 'drawDeck' };
   }
@@ -90,5 +118,10 @@ export function decideOkey(view: OkeyView, rng: () => number = Math.random): Oke
     const okeyFinish = finishes.find((t) => isJoker(t, ctx));
     return { type: 'finish', tileId: (okeyFinish ?? finishes[0]).id };
   }
-  return { type: 'discard', tileId: bestDiscard(hand, ctx, rng).tile.id };
+  if (diff === 'easy' && finishes.length === 0 && rng() < 0.15) {
+    // kolay bot ara sıra dalgın oynar
+    const pool = hand.filter((t) => !isJoker(t, ctx));
+    return { type: 'discard', tileId: pool[Math.floor(rng() * pool.length)].id };
+  }
+  return { type: 'discard', tileId: bestDiscard(hand, ctx, rng, view, diff).tile.id };
 }

@@ -145,7 +145,7 @@ export class TavlaUI implements GameUI {
     if (s.dice[0] === s.dice[1] && Math.random() < 0.6) this.host.react(1, 'happy', `Çift ${s.dice[0]}! Gördün mü?`);
     this.render();
     await this.delay(700);
-    const seq = chooseSequence(s, 1, [...s.remaining], this.rng, 0.8);
+    const seq = chooseSequence(s, 1, [...s.remaining], this.rng, 0.8, this.host.difficulty);
     if (!seq.length) this.host.react(1, 'angry', 'Kapı kapalı, oynayamadım!');
     for (const m of seq) {
       if (!this.alive) return;

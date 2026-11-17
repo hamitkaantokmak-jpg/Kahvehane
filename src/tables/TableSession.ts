@@ -5,7 +5,7 @@
 import type { Game } from '../core/Game';
 import type { Seat } from '../world/Kahvehane';
 import type { NPC } from '../npc/NPC';
-import { GAME_META, GameId } from '../games/common/types';
+import { GAME_META, GameId, Difficulty, DIFFICULTY_TR } from '../games/common/types';
 import { pickLine } from '../npc/personalities';
 import { sfx, SfxName } from '../audio/Sfx';
 import { h, btn } from '../ui/dom';
@@ -20,6 +20,7 @@ export type ReactKind = 'think' | 'happy' | 'angry' | 'win' | 'lose' | 'goodMove
 export interface GameHost {
   readonly names: string[];
   readonly gameId: GameId;
+  readonly difficulty: Difficulty;
   isHuman(i: number): boolean;
   react(i: number, kind: ReactKind, line?: string): void;
   sfx(name: SfxName): void;
@@ -38,6 +39,7 @@ export interface GameUI {
 
 export interface GameOptions {
   okey101Hands: number;
+  difficulty: Difficulty;
   tavlaKatmerli: boolean;
   tavlaTarget: number;
   pistiTarget: number;
@@ -47,11 +49,12 @@ export class TableSession implements GameHost {
   readonly root: HTMLDivElement;
   names: string[] = [];
   gameId: GameId = 'okey';
+  get difficulty() { return this.options.difficulty; }
   private participants: (NPC | 'player')[] = [];
   ui: GameUI | null = null;
   private exitConfirm: HTMLDivElement | null = null;
   readonly table3d: TableView3D;
-  options: GameOptions = { okey101Hands: 3, tavlaKatmerli: true, tavlaTarget: 5, pistiTarget: 151 };
+  options: GameOptions = { difficulty: 'medium', okey101Hands: 3, tavlaKatmerli: true, tavlaTarget: 5, pistiTarget: 151 };
 
   constructor(private game: Game, readonly seat: Seat) {
     this.root = h('div', 'game-root');
@@ -95,6 +98,18 @@ export class TableSession implements GameHost {
       list.appendChild(card);
     }
     panel.appendChild(list);
+    const diffRow = h('div', 'diff-row');
+    diffRow.appendChild(h('span', '', 'Rakip seviyesi:'));
+    for (const d of ['easy', 'medium', 'hard'] as Difficulty[]) {
+      const b = btn(DIFFICULTY_TR[d], `small${this.options.difficulty === d ? ' accent' : ''}`, () => {
+        this.options.difficulty = d;
+        diffRow.querySelectorAll('button').forEach((x) => x.classList.remove('accent'));
+        b.classList.add('accent');
+      });
+      b.dataset.diff = d;
+      diffRow.appendChild(b);
+    }
+    panel.insertBefore(diffRow, list);
     panel.appendChild(btn('Masadan kalk', 'ghost', () => this.exit()));
     this.root.appendChild(panel);
   }

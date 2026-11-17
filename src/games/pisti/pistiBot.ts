@@ -2,12 +2,20 @@
  * Pişti botu: yalnızca kendi elini, yerdeki üst kartı ve herkese açık oynanmış kartları bilir.
  */
 import { Card, JACK, PistiView, cardPoints } from './pisti';
+import type { Difficulty } from '../common/types';
 
-export function choosePistiCard(v: PistiView, rng: () => number = Math.random): number {
+export function choosePistiCard(v: PistiView, rng: () => number = Math.random, diff: Difficulty = 'medium'): number {
+  if (diff === 'easy') {
+    // kolay: alabiliyorsa ilk uygun kartla alır, yoksa rastgele oynar
+    const cap = v.top ? v.hand.find((c) => c.rank === v.top!.rank) ?? (rng() < 0.5 ? v.hand.find((c) => c.rank === JACK) : undefined) : undefined;
+    return (cap ?? v.hand[Math.floor(rng() * v.hand.length)]).id;
+  }
   const seen = new Map<number, number>();
-  for (const c of [...v.played, ...v.hand]) seen.set(c.rank, (seen.get(c.rank) ?? 0) + 1);
+  // zor: oynanmış tüm kartları sayar; orta: yalnızca son birkaç kartı hatırlar
+  const memory = diff === 'hard' ? v.played : v.played.slice(-4);
+  for (const c of [...memory, ...v.hand]) seen.set(c.rank, (seen.get(c.rank) ?? 0) + 1);
   const unseen = (rank: number) => 4 - (seen.get(rank) ?? 0);
-  const unknownCards = Math.max(1, 52 - v.played.length - v.hand.length);
+  const unknownCards = Math.max(1, 52 - memory.length - v.hand.length);
   const pileValueGuess = (v.top ? cardPoints(v.top) : 0) + Math.max(0, v.pileSize - 1) * 0.25;
 
   let best: Card = v.hand[0];

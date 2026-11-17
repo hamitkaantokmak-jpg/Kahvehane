@@ -274,3 +274,4 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
   .okeyinfo { font-size: 12px; }
   .bubble { font-size: 12px; max-width: 160px; }
 }
+.diff-row { display: flex; gap: 8px; justify-content: center; align-items: center; font-weight: 700; margin: 6px 0; }

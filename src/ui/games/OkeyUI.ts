@@ -69,7 +69,7 @@ export class OkeyUI implements GameUI {
       this.host.react(p, 'happy', 'Gösterge bende!');
       this.host.sfx('tile');
     }
-    const a = decideOkey(O.viewFor(this.s, p), this.rng);
+    const a = decideOkey(O.viewFor(this.s, p), this.rng, this.host.difficulty);
     try {
       if (a.type === 'drawDeck') { O.drawFromDeck(this.s, p); this.host.sfx('tile'); }
       else if (a.type === 'drawDiscard') { O.drawFromDiscard(this.s, p); this.host.sfx('tile'); if (Math.random() < 0.4) this.host.react(p, 'goodMove'); }

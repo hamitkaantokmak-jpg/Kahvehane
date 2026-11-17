@@ -3,6 +3,7 @@
  * Karar iki aşamalıdır: çekme kararı ve oynama planı (açma, serme, işleme, atma).
  */
 import { Tile, toCounts, bestPartition, candidatesToTiles, isJoker, identity, isPair, MeldCandidate, OkeyCtx } from '../common/tiles';
+import type { Difficulty } from '../common/types';
 import { Okey101View, RULES_101, OPEN_MIN, PAIR_MIN, tryExtend, TableMeld, checkMeld } from './okey101';
 
 export type Bot101Action =
@@ -51,9 +52,9 @@ function processableTarget(table: TableMeld[], tile: Tile, ctx: OkeyCtx): TableM
   return null;
 }
 
-export function decideDraw101(v: Okey101View): 'deck' | 'discard' {
+export function decideDraw101(v: Okey101View, diff: Difficulty = 'medium'): 'deck' | 'discard' {
   const top = v.discardTops[(v.me + 3) % 4];
-  if (!top || v.deckCount === 0) return 'deck';
+  if (!top || v.deckCount === 0 || diff === 'easy') return 'deck';
   const hand = v.hand;
   if (v.opened[v.me] === 'none') {
     const without = bestMelds(hand, v.ctx, 'value').value;
@@ -68,7 +69,7 @@ export function decideDraw101(v: Okey101View): 'deck' | 'discard' {
     if (!isJoker(top, v.ctx) && processableTarget(v.table, top, v.ctx)) return 'discard';
     const without = bestMelds(hand, v.ctx, 'cover').melds.reduce((a, m) => a + m.concrete.length + m.jokers, 0);
     const withT = bestMelds([...hand, top], v.ctx, 'cover').melds.reduce((a, m) => a + m.concrete.length + m.jokers, 0);
-    if (withT > without + 1) return 'discard';
+    if (withT > without + (diff === 'hard' ? 0 : 1)) return 'discard';
   }
   if (v.opened[v.me] === 'pairs') {
     if (!isJoker(top, v.ctx) && processableTarget(v.table, top, v.ctx)) return 'discard';
@@ -78,7 +79,8 @@ export function decideDraw101(v: Okey101View): 'deck' | 'discard' {
 }
 
 /** Bu tur için eylem planı (çekme yapılmış olmalı). */
-export function planTurn101(v: Okey101View, rng: () => number = Math.random): Bot101Action[] {
+export function planTurn101(v: Okey101View, rng: () => number = Math.random, diff: Difficulty = 'medium'): Bot101Action[] {
+  const endgame = v.deckCount <= 6;
   const ctx = v.ctx;
   let hand = [...v.hand];
   // yerden alınan taş, aday listesinde önce kullanılsın
@@ -90,7 +92,12 @@ export function planTurn101(v: Okey101View, rng: () => number = Math.random): Bo
   let fakeId = -1;
 
   if (opened === 'none') {
-    const best = bestMelds(hand, ctx, 'value');
+    // zor: 101'i geçen en çok taşlı bölümlemeyi tercih et (açınca elde az taş kalsın)
+    let best = bestMelds(hand, ctx, 'value');
+    if (diff === 'hard') {
+      const cover = bestMelds(hand, ctx, 'cover');
+      if (cover.value >= OPEN_MIN) best = cover;
+    }
     let groups = candidatesToTiles(best.melds, hand, ctx);
     // en az bir taş kalmalı
     if (groups.flat().length >= hand.length) {
@@ -138,7 +145,7 @@ export function planTurn101(v: Okey101View, rng: () => number = Math.random): Bo
       changed = false;
       for (const t of [...hand]) {
         if (hand.length <= 1) break;
-        if (isJoker(t, ctx) && hand.length > 3) continue;
+        if (isJoker(t, ctx) && (diff === 'easy' || (hand.length > 3 && diff !== 'hard'))) continue;
         const target = table.find((m) => m.id > 0 && tryExtend(m, t, ctx));
         if (!target) continue;
         const slots = tryExtend(target, t, ctx)!;
@@ -166,7 +173,9 @@ export function planTurn101(v: Okey101View, rng: () => number = Math.random): Bo
     const potential = bestMelds(rest, ctx, opened === 'none' ? 'value' : 'cover');
     const covered = potential.melds.reduce((a, m) => a + m.concrete.length + m.jokers, 0);
     const n = identity(t, ctx).num;
-    const score = (opened === 'none' ? potential.value : covered * 20 + n) + connectivity(rest, ctx) + rng() * 0.3;
+    const dump = opened !== 'none' && diff === 'hard' && endgame ? n * 3 : n;
+    const near = opened !== 'none' && diff === 'hard' ? rest.reduce((acc, x) => acc + nearTable(table, x, ctx), 0) * 6 : 0;
+    const score = (opened === 'none' ? potential.value : covered * 20 + dump) + connectivity(rest, ctx) + near + rng() * (diff === 'easy' ? 25 : 0.3);
     if (score > bestScore) { bestScore = score; bestTile = t; }
   }
   actions.push({ type: 'discard', tileId: bestTile.id });
@@ -184,4 +193,25 @@ function connectivity(hand: Tile[], ctx: OkeyCtx): number {
       else if (a.num === b.num && a.color === b.color) c += 0.7;
     }
   return c;
+}
+
+/** Tek adımlık karar: her eylemden sonra yeniden planlanır (yeni serilen perlere de işleme yapılabilir). */
+export function stepTurn101(v: Okey101View, rng: () => number = Math.random, diff: Difficulty = 'medium'): Bot101Action | null {
+  const plan = planTurn101(v, rng, diff);
+  return plan.length ? plan[0] : null;
+}
+
+/** Taş, masadaki bir perin ucuna 2 adım uzaklıkta mı (bir sonraki işlemeyle işlenebilir hale gelir)? */
+function nearTable(table: TableMeld[], t: Tile, ctx: OkeyCtx): number {
+  if (isJoker(t, ctx)) return 1;
+  const id = identity(t, ctx);
+  let k = 0;
+  for (const m of table) {
+    if (m.kind !== 'run') continue;
+    const c = m.slots[0].color;
+    if (c !== id.color) continue;
+    const lo = m.slots[0].num, hi = m.slots[m.slots.length - 1].num;
+    if (id.num === hi + 2 || id.num === lo - 2) k++;
+  }
+  return k;
 }

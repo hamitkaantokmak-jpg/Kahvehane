@@ -51,6 +51,8 @@ export interface OkeyState {
   handNo: number;
   result: HandResult | null;
   matchOver: boolean;
+  /** Herkese açık: yerden (soldan) alınan taşlar. */
+  takes: { player: number; tile: Tile }[];
   /** Son çekilen taş (UI vurgusu için). */
   lastDrawn: number | null;
   log: string[];
@@ -61,7 +63,7 @@ export const PLAYER_COUNT = 4;
 export function newMatch(rng: Rng = createRng(), starter = 0): OkeyState {
   const s: OkeyState = {
     hands: [], deck: [], discards: [], indicator: null as unknown as Tile, ctx: { okeyColor: 0, okeyNum: 1 },
-    current: starter, starter, phase: 'discard', turn: 0, hasDiscarded: [], indicatorShownBy: null,
+    current: starter, starter, phase: 'discard', turn: 0, takes: [], hasDiscarded: [], indicatorShownBy: null,
     scores: Array(PLAYER_COUNT).fill(START_POINTS), handNo: 0, result: null, matchOver: false, lastDrawn: null, log: [],
   };
   dealHand(s, rng, starter);
@@ -82,6 +84,7 @@ export function dealHand(s: OkeyState, rng: Rng, starter: number): void {
   s.turn = 0;
   s.hasDiscarded = Array(PLAYER_COUNT).fill(false);
   s.indicatorShownBy = null;
+  s.takes = [];
   s.result = null;
   s.lastDrawn = null;
   s.handNo++;
@@ -122,6 +125,7 @@ export function drawFromDiscard(s: OkeyState, p: number): Tile {
   s.hands[p].push(t);
   s.phase = 'discard';
   s.lastDrawn = t.id;
+  s.takes.push({ player: p, tile: { ...t } });
   return t;
 }
 
@@ -229,6 +233,7 @@ export interface OkeyView {
   phase: OkeyPhase;
   current: number;
   canShowIndicator: boolean;
+  takes: { player: number; tile: Tile }[];
 }
 
 export function viewFor(s: OkeyState, p: number): OkeyView {
@@ -243,6 +248,7 @@ export function viewFor(s: OkeyState, p: number): OkeyView {
     phase: s.phase,
     current: s.current,
     canShowIndicator: canShowIndicator(s, p),
+    takes: s.takes.map((x) => ({ player: x.player, tile: { ...x.tile } })),
   };
 }
 
