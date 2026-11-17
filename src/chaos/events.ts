@@ -2,7 +2,7 @@
  * Kaos olayı kayıt defteri (saf veri). Yeni olay eklemek için yalnızca buraya bir tanım eklenir;
  * oyun katmanı aynı id ile bir işleyici (handler) kaydeder. İşleyicisi olmayan olaylar seçilmez.
  */
-export type ChaosEventId = 'brawl' | 'tvGoal' | 'powerCut' | 'cat';
+export type ChaosEventId = 'brawl' | 'tvGoal' | 'powerCut' | 'cat' | 'tableFlip' | 'objection' | 'kibitz';
 
 export interface ChaosEventDef {
   id: ChaosEventId;
@@ -24,6 +24,10 @@ export const DEFAULT_EVENTS: ChaosEventDef[] = [
   { id: 'tvGoal', label: 'TV\'de gol', minTension: 0, maxTension: 70, weight: 4, cooldown: 45, tension: 5 },
   { id: 'powerCut', label: 'Elektrik kesintisi', minTension: 20, maxTension: 100, weight: 1.5, cooldown: 120, tension: 6 },
   { id: 'cat', label: 'Kedi', minTension: 0, maxTension: 80, weight: 2, cooldown: 90, tension: 15 },
+  // tetiklenen olaylar (ağırlık 0: direktör kendiliğinden seçmez; oyun içindeki bir duruma bağlı)
+  { id: 'tableFlip', label: 'Masa devirme', minTension: 0, maxTension: 100, weight: 0, cooldown: 120, tension: 25 },
+  { id: 'objection', label: 'İtiraz', minTension: 0, maxTension: 100, weight: 0, cooldown: 8, tension: 4 },
+  { id: 'kibitz', label: 'Kibitz', minTension: 0, maxTension: 100, weight: 0, cooldown: 9, tension: 0 },
 ];
 
 /** Gerginlik kaynakları ve puanları (tek yerden ayarlanır). */

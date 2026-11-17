@@ -338,3 +338,4 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
 .horse-btn { display: flex; align-items: center; gap: 6px; justify-content: space-between; }
 .hc { display: inline-block; width: 14px; height: 14px; border-radius: 50%; border: 2px solid var(--ink); }
 @media (max-width: 520px) { .horse-list { grid-template-columns: 1fr; } }
+.objection-btn { position: absolute; top: 112px; left: 140px; z-index: 26; }

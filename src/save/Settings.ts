@@ -11,6 +11,8 @@ export interface Settings {
   chaosIntensity: 'calm' | 'normal' | 'chaos';
   /** Çay fırlatma: herkes (oyuncu + NPC) / kapalı */
   teaThrow: 'all' | 'off';
+  /** Masada izleyici NPC yorumları (kibitz) */
+  kibitz: boolean;
 }
 
 export interface Stats {
@@ -25,7 +27,7 @@ const STATS_KEY = 'kahvehane.stats.v1';
 
 export const DEFAULT_SETTINGS: Settings = {
   master: 0.8, sfx: 0.9, ambience: 0.5, muted: false,
-  quality: matchMediaSafe('(pointer: coarse)') ? 'low' : 'high', sensitivity: 1, invertY: false, chaosIntensity: 'normal', teaThrow: 'all',
+  quality: matchMediaSafe('(pointer: coarse)') ? 'low' : 'high', sensitivity: 1, invertY: false, chaosIntensity: 'normal', teaThrow: 'all', kibitz: true,
 };
 
 function matchMediaSafe(q: string) {

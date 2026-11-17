@@ -76,7 +76,7 @@ export class ChaosDirector {
   eligible(): ChaosEventDef[] {
     const t = this.state.tension;
     return this.registry.all().filter((d) =>
-      this.available.has(d.id) && t >= d.minTension && t <= d.maxTension && (this.state.cooldowns[d.id] ?? 0) <= 0 && d.id !== this.state.lastEvent);
+      d.weight > 0 && this.available.has(d.id) && t >= d.minTension && t <= d.maxTension && (this.state.cooldowns[d.id] ?? 0) <= 0 && d.id !== this.state.lastEvent);
   }
 
   /** Ağırlıklı seçim (deterministik: enjekte edilen rng) */
