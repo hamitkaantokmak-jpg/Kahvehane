@@ -9,6 +9,8 @@ export interface Personality {
   favoriteTables: ('okey' | 'tavla' | 'kart')[];
   activities: Partial<Record<ActivityKind, number>>;
   signature: ActionName[];
+  /** Bahsi artırmaya meyil (0..1) */
+  betBoldness: number;
   /** Kavgada yardım edeceği dostları */
   friends: string[];
   /** Kavgada karşısına geçeceği rakipleri */
@@ -35,6 +37,10 @@ export interface Personality {
     calmDown: string[];
     /** Kavgadan kaçarken */
     brawlFlee: string[];
+    /** Veresiye sınırını aşmış oyuncuya laf */
+    debtTease: string[];
+    /** Bahsi artırmayı önerirken */
+    betRaise: string[];
   };
 }
 
@@ -42,6 +48,7 @@ export const PERSONALITIES: Record<string, Personality> = {
   riza: {
     id: 'riza', temper: 0.9, favoriteTables: ['okey'], activities: { sitTable: 5, watchTv: 1, chat: 2, wander: 1 },
     signature: ['slamTable', 'angry', 'think'],
+    betBoldness: 0.35,
     friends: ['kemal', 'hasan'],
     rivals: ['cemal', 'ferhat'],
     lines: {
@@ -62,11 +69,14 @@ export const PERSONALITIES: Record<string, Personality> = {
       brawlBreakUp: ['Durun be! Ayıp ayıp!', 'Ben yaşlıyım ama araya girerim!'],
       calmDown: ['Tamam, tamam... Ama haklıydım.', 'Hadi bir çay söyleyin de unutalım.'],
       brawlFlee: ['Belim tutulur, ben uzaktan bakarım!', 'Bu iş gençlerin işi!'],
+      debtTease: ['Evlat, Şükrü\'ye borcun dağ oldu!', 'Benim zamanımda veresiye ayıptı!'],
+      betRaise: ['Bu bahis az, bir çay daha koy!', 'Ustaya karşı bu kadar mı?'],
     },
   },
   cemal: {
     id: 'cemal', temper: 0.6, favoriteTables: ['tavla', 'okey'], activities: { sitTable: 4, chat: 2, watchTv: 1, wander: 1 },
     signature: ['leanBack', 'point', 'shrug'],
+    betBoldness: 0.9,
     friends: ['nihat'],
     rivals: ['riza', 'kemal'],
     lines: {
@@ -87,11 +97,14 @@ export const PERSONALITIES: Record<string, Personality> = {
       brawlBreakUp: ['Durun, bahsi bozmayın!', 'Ayrılın, iddialar geçersiz!'],
       calmDown: ['Peki, berabere sayalım.', 'Neyse, bahis iptal.'],
       brawlFlee: ['Bu kavgaya oran vermem, kaçıyorum!', 'Ceketim kirlenmesin!'],
+      debtTease: ['Borçla bahis olmaz aslanım, önce hesabı kapat!', 'Bahse girerim bu borcu ödeyemezsin, şaka şaka!'],
+      betRaise: ['Az bu! İkiye katlayalım mı?', 'Reis masasında bu bahis oynanmaz, artıralım!', 'İddiasına varım, bahsi büyütelim!'],
     },
   },
   nihat: {
     id: 'nihat', temper: 0.3, favoriteTables: ['kart', 'okey'], activities: { sitTable: 4, chat: 3, wander: 2, watchTv: 1 },
     signature: ['laugh', 'point', 'bellyDance'],
+    betBoldness: 0.5,
     friends: ['riza', 'cemal', 'sukru', 'hasan', 'ferhat', 'kemal'],
     rivals: [],
     lines: {
@@ -112,11 +125,14 @@ export const PERSONALITIES: Record<string, Personality> = {
       brawlBreakUp: ['Abiler, pişti yapalım kavga etmeyelim!', 'Hadi hadi, herkes köşesine!', 'Gülün biraz be!'],
       calmDown: ['Hah, işte böyle. Kim çay içer?', 'Barıştık mı? Ben çayları söylüyorum!'],
       brawlFlee: ['Ben kartları toplayıp kaçıyorum!', 'Hah, ben yokum!'],
+      debtTease: ['Hesap defterinde adın birinci sırada!', 'Şükrü seni bulaşığa koyacak, hıh hıh!'],
+      betRaise: ['Biraz daha koyalım, heyecan olsun!', 'Pişti gibi bahis, ikiye katla!'],
     },
   },
   sukru: {
     id: 'sukru', temper: 0.4, favoriteTables: [], activities: { serve: 10 },
     signature: ['pour', 'wave', 'talk'],
+    betBoldness: 0.1,
     friends: ['riza', 'cemal', 'nihat', 'hasan', 'ferhat', 'kemal'],
     rivals: [],
     lines: {
@@ -137,11 +153,14 @@ export const PERSONALITIES: Record<string, Personality> = {
       brawlBreakUp: ['Beyler, sakin olun! Çaylar benden!', 'Abiler, ocak başında kavga olmaz!', 'Durun durun, bardak kalmadı!'],
       calmDown: ['Beyler, sakin olun! Taze çay geliyor!', 'Hadi barışın, herkese bir demli!', 'Tamam abiler, çaylar benden!'],
       brawlFlee: ['Tepsiyi kurtarmam lazım!', 'Ben ocağa kaçıyorum!'],
+      debtTease: ['Abi, defterde yer kalmadı!', 'Abi önce eski çayları bir öde.'],
+      betRaise: ['Abi benim işim var ama olur, artıralım.', 'Bir çay daha koyalım abi.'],
     },
   },
   hasan: {
     id: 'hasan', temper: 0.2, favoriteTables: ['tavla'], activities: { sleep: 6, bench: 2, watchTv: 1 },
     signature: ['leanBack', 'shrug'],
+    betBoldness: 0.2,
     friends: ['riza', 'nihat'],
     rivals: [],
     lines: {
@@ -162,11 +181,14 @@ export const PERSONALITIES: Record<string, Personality> = {
       brawlBreakUp: ['Yavaş olun, uyuyan var...', 'Kavga etmeyin, gelin uyuyalım.'],
       calmDown: ['Oh, sonunda sessizlik... zzz', 'Bitti mi? İyi, uyuyorum.'],
       brawlFlee: ['Ben bankta uyumaya gidiyorum.', 'Bana dokunmayın, uykum var!'],
+      debtTease: ['Borç... zzz... ödenir mi?', 'Veresiye defteri... rüyamda da vardı...'],
+      betRaise: ['Artıralım mı? Ben uyurken karar verin...', 'Olur... zzz...'],
     },
   },
   ferhat: {
     id: 'ferhat', temper: 0.75, favoriteTables: ['kart'], activities: { watchTv: 6, chat: 1, sitTable: 1 },
     signature: ['cheer', 'angry', 'point'],
+    betBoldness: 0.7,
     friends: ['nihat', 'cemal'],
     rivals: ['kemal', 'riza'],
     lines: {
@@ -187,11 +209,14 @@ export const PERSONALITIES: Record<string, Personality> = {
       brawlBreakUp: ['Hakem benim, ayrılın!', 'Oyun durdu, ayrılın!'],
       calmDown: ['Tamam, devre arası.', 'Maç bitti, tokalaşalım.'],
       brawlFlee: ['Ben maça dönüyorum!', 'Sakatlanmadan kaçayım!'],
+      debtTease: ['Borcun transfer bütçesi gibi, kabarık!', 'Kardeşim, önce kulübün borcunu kapat!'],
+      betRaise: ['Gol gibi bahis istiyorum, artıralım!', 'Maç heyecanı lazım, ikiye katla!'],
     },
   },
   kemal: {
     id: 'kemal', temper: 0.5, favoriteTables: ['okey', 'kart'], activities: { sitTable: 4, chat: 3, bench: 1 },
     signature: ['think', 'talk', 'facepalm'],
+    betBoldness: 0.4,
     friends: ['riza'],
     rivals: ['cemal', 'ferhat'],
     lines: {
@@ -212,6 +237,8 @@ export const PERSONALITIES: Record<string, Personality> = {
       brawlBreakUp: ['Muhtarlık emridir, ayrılın!', 'Tutanak tutacağım, durun!', 'Mahallede kavga yasak!'],
       calmDown: ['Barış tutanağı imzalandı.', 'Kayıtlara geçti, herkes çayını içsin.'],
       brawlFlee: ['Muhtarlığa gidip tutanak getireyim!', 'Ben resmi işlere bakayım!'],
+      debtTease: ['Muhtarlık kayıtlarında borçlu görünüyorsun.', 'Borç senedi imzaladın mı evlat?'],
+      betRaise: ['Bütçe uygun, bahsi artırabiliriz.', 'Resmi teklifim: ikiye katlayalım.'],
     },
   },
 };
@@ -227,3 +254,14 @@ export const ARGUMENTS: [string, string, string, string][] = [
 export function pickLine(arr: string[]): string {
   return arr[Math.floor(Math.random() * arr.length)];
 }
+
+/** Şükrü'ye özgü ekonomi replikleri */
+export const SUKRU_LINES = {
+  noCredit: ['Abi kusura bakma, defter doldu. Önce borcu bir kapat.', 'Abi veresiye sınırı doldu, çay yok bugün!', 'Abi defterde yer kalmadı, bir el bulaşık yıkasan?'],
+  credit: ['Tamam abi, deftere yazdım.', 'Veresiye yazıldı abi, unutma ha!'],
+  workOffer: ['Abi paran yoksa dert etme, bulaşık var! Semavere gel.', 'Abi bir el bulaşık yıka, borçtan düşerim.'],
+  workDone: ['Eline sağlık abi, bardaklar pırıl pırıl!', 'Helal abi, borçtan düştüm!'],
+  raise: ['Duyuru! Çaya zam geldi, şekeri ben ödüyorum!', 'Abiler, fiyatlar azıcık arttı... Semaver de enflasyonda!'],
+  raiseOver: ['Zam bitti abiler, çay eski fiyatına!'],
+  paid: ['Sağ ol abi, hesap temiz!', 'Eyvallah abi, defteri sildim!'],
+};

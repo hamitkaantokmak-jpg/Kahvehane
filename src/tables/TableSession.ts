@@ -14,6 +14,7 @@ import { Okey101UI } from '../ui/games/Okey101UI';
 import { TavlaUI } from '../ui/games/TavlaUI';
 import { PistiUI } from '../ui/games/PistiUI';
 import { TableView3D } from './TableView3D';
+import { STAKES, stakeCoins, okeyOutcome, okey101Outcome, pistiOutcome, tavlaOutcome, wantsRaise, Outcome, AppliedTransfer } from '../economy/Betting';
 
 export type ReactKind = 'think' | 'happy' | 'angry' | 'win' | 'lose' | 'goodMove' | 'slam' | 'play' | 'surprise';
 
@@ -42,6 +43,8 @@ export interface GameUI {
 export interface GameOptions {
   okey101Hands: number;
   okey101Doubling: boolean;
+  /** Bahis (çay cinsinden, 0 = yok) */
+  stake: number;
   difficulty: Difficulty;
   tavlaKatmerli: boolean;
   tavlaTarget: number;
@@ -57,7 +60,7 @@ export class TableSession implements GameHost {
   ui: GameUI | null = null;
   private exitConfirm: HTMLDivElement | null = null;
   readonly table3d: TableView3D;
-  options: GameOptions = { difficulty: 'medium', okey101Hands: 3, okey101Doubling: false, tavlaKatmerli: true, tavlaTarget: 5, pistiTarget: 151 };
+  options: GameOptions = { difficulty: 'medium', okey101Hands: 3, okey101Doubling: false, stake: 0, tavlaKatmerli: true, tavlaTarget: 5, pistiTarget: 151 };
 
   constructor(private game: Game, readonly seat: Seat) {
     this.root = h('div', 'game-root');
@@ -102,6 +105,19 @@ export class TableSession implements GameHost {
       list.appendChild(card);
     }
     panel.appendChild(list);
+    // bahis seçimi (oyun içi sanal kahve parası)
+    const stakeRow = h('div', 'stake-row');
+    stakeRow.appendChild(h('span', '', 'Bahis:'));
+    for (const st of STAKES) {
+      const b = btn(st === 0 ? 'Yok' : `${st} çay (${stakeCoins(st)}🪙)`, `small${this.options.stake === st ? ' accent' : ''}`, () => {
+        this.options.stake = st;
+        stakeRow.querySelectorAll('button').forEach((x) => x.classList.remove('accent'));
+        b.classList.add('accent');
+      });
+      b.dataset.stake = String(st);
+      stakeRow.appendChild(b);
+    }
+    panel.insertBefore(stakeRow, list);
     const diffRow = h('div', 'diff-row');
     diffRow.appendChild(h('span', '', 'Rakip seviyesi:'));
     for (const d of ['easy', 'medium', 'hard'] as Difficulty[]) {
@@ -182,6 +198,65 @@ export class TableSession implements GameHost {
     const ui = this.createUI(gid);
     this.ui = ui;
     this.root.appendChild(ui.el);
+    this.settledGames.clear();
+    if (this.options.stake > 0) {
+      this.game.hud.toast(`💰 Bahisli masa: kaybeden ${this.options.stake} çay (${stakeCoins(this.options.stake)}🪙) öder.`, 3.5);
+      setTimeout(() => this.offerRaise(), 1800);
+    }
+  }
+
+  /** Bahsi artırmaya meyilli bir NPC (ör. Cemal) iki katına çıkarmayı teklif eder */
+  private offerRaise() {
+    if (!this.ui) return;
+    const npcs = this.participants.filter((p): p is NPC => p !== 'player').sort((a, b) => b.p.betBoldness - a.p.betBoldness);
+    const bold = npcs[0];
+    if (!bold || !wantsRaise(bold.p.betBoldness, this.options.stake, this.game.rng())) return;
+    const next = Math.min(10, this.options.stake * 2);
+    const line = pickLine(bold.p.lines.betRaise);
+    bold.c.say(line, 3);
+    bold.c.anim.play('point');
+    const d = h('div', 'modal raise-modal');
+    d.innerHTML = `<div class="panel"><h3>${bold.c.name}: "${line}"</h3><p>Bahis <b>${this.options.stake} çay</b> → <b>${next} çay (${stakeCoins(next)}🪙)</b> olsun mu?</p></div>`;
+    const row = h('div', 'row-btns');
+    row.appendChild(btn('Kabul et', 'primary', () => { d.remove(); this.options.stake = next; this.game.hud.toast(`💰 Bahis ${next} çaya çıktı!`); bold.c.anim.play('cheer'); bold.c.say('İşte bu!', 2); }));
+    row.appendChild(btn('Yok, kalsın', 'ghost', () => { d.remove(); bold.c.anim.play('shrug'); bold.c.say('Peki peki, korkma...', 2); }));
+    d.querySelector('.panel')!.appendChild(row);
+    this.root.appendChild(d);
+  }
+
+  private settledGames = new Set<string>();
+
+  /** Oyun sonucunu (kural motoruna dokunmadan) bahis sonucuna çevirir ve ödemeyi yapar */
+  private settle(outcome: Outcome | null, key: string) {
+    if (this.options.stake <= 0 || this.settledGames.has(key)) return;
+    this.settledGames.add(key);
+    const ids = this.participants.map((p) => (p === 'player' ? 'player' : p.id));
+    const res = this.game.economy.settle(outcome, this.options.stake, ids);
+    if (!res.length) return;
+    this.showSettlement(res);
+  }
+
+  private showSettlement(res: AppliedTransfer[]) {
+    const name = (id: string) => (id === 'player' ? 'Sen' : this.game.npcs.find((n) => n.id === id)?.c.name ?? id);
+    const lines = res.map((t) => `${name(t.from)} → ${name(t.to)}: ${t.amount}🪙${t.onCredit ? ` (${t.onCredit}🪙 veresiye)` : ''}`);
+    this.lastSettlement = lines;
+    setTimeout(() => {
+      const panel = this.root.querySelector('.modal .panel');
+      const box = h('div', 'settle-list', `💰 Hesap:<br>${lines.join('<br>')}`);
+      if (panel) panel.insertBefore(box, panel.querySelector('.row-btns'));
+      else this.game.hud.toast(`💰 ${lines.join(' · ')}`, 4);
+    }, 50);
+    this.game.audioCoins();
+  }
+  lastSettlement: string[] = [];
+
+  /** Maç sonu sonucunu oyunun durumundan oku (tavla her oyun sonunda ayrı ödenir) */
+  private settleMatch() {
+    const s = (this.ui as unknown as { s: Record<string, unknown> } | null)?.s;
+    if (!s) return;
+    if (this.gameId === 'okey') this.settle(okeyOutcome(s.scores as number[]), `okey:${s.handNo}`);
+    else if (this.gameId === 'okey101') this.settle(okey101Outcome(s.totals as number[]), `101:${s.handNo}`);
+    else if (this.gameId === 'pisti2' || this.gameId === 'pisti4') this.settle(pistiOutcome(s.totals as number[], this.gameId === 'pisti2' ? 2 : 4), `pisti:${s.handNo}`);
   }
 
   private createUI(gid: GameId): GameUI {
@@ -267,6 +342,7 @@ export class TableSession implements GameHost {
 
   matchFinished(humanWon: boolean | null) {
     if (humanWon !== null) this.game.recordResult(this.gameId, humanWon);
+    if (this.gameId !== 'tavla') this.settleMatch();
     // diğer katılımcılar tepki verir
     this.participants.forEach((p, i) => {
       if (p === 'player') return;
@@ -320,6 +396,11 @@ export class TableSession implements GameHost {
   private pauseBanner: HTMLDivElement | null = null;
 
   update(dt: number) {
+    // tavla: her oyunun sonucu (normal/mars/katmerli) ayrı ödenir
+    if (this.ui && this.gameId === 'tavla') {
+      const s = (this.ui as unknown as { s: { lastResult: { winner: 0 | 1; kind: 'normal' | 'mars' | 'katmerli' } | null; gameNo: number } }).s;
+      if (s.lastResult) this.settle(tavlaOutcome(s.lastResult.winner, s.lastResult.kind), `tavla:${s.gameNo}`);
+    }
     if (this.ui) {
       if (!this.pauseBanner) { this.pauseBanner = h('div', 'pause-banner'); this.root.appendChild(this.pauseBanner); }
       const away = this.awayNames();

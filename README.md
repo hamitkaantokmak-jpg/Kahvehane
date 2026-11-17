@@ -19,6 +19,7 @@ Mobil: sol yarı sanal joystick (uzağa çekince koşar), sağ yarı kamera, ✋
 | Klasör | Görev |
 |---|---|
 | `src/chaos` | **Saf mantık:** Kaos Direktörü (gerginlik, olay seçimi, kayıt defteri), zincirleme kavga modeli |
+| `src/economy` | **Saf mantık:** cüzdan, veresiye defteri, fiyatlar/zam, günlük bonus, iflas koruması, bahis hesabı; kalıcılık arayüzü |
 | `src/games/common` | RNG, taş seti, per doğrulama, el çözümleyici (grafikten bağımsız) |
 | `src/games/okey`, `okey101`, `tavla`, `pisti` | Her oyunun kural motoru + ayrı bot modülü |
 | `src/world` | Kahvehane sahnesi, materyaller, prosedürel dokular, çarpışma + A* yol bulma |
@@ -84,3 +85,20 @@ Saf mantık (`src/chaos/`) three.js ve DOM kullanmaz; rastgelelik `rng.ts` ile, 
   bot masasına dönünce kaldığı yerden devam eder. İnsan oyuncu kendi hamlesini yapabilir.
 - **HUD:** ekranın üstünde "Gerginlik" çubuğu (renk/seviye), tavana yaklaşınca uyarı yazısı.
 - **Ayar:** Menü → Kaos yoğunluğu: Sakin (puan ×0.6, olay sıklığı ×0.5) / Normal / Tam kaos (×1.6 / ×2).
+
+## Ekonomi (Aşama 2)
+Tüm para **oyun içi sanal "kahve parası"dır (🪙)**; gerçek parayla, ödemeyle ya da dışarı çıkarılabilir bir değerle hiçbir bağı yoktur.
+Mantık `src/economy/` altında saftır; kalıcılık `EconomyStore` arayüzü arkasında (şimdilik localStorage, `kahvehane.economy.v1`).
+
+- **Cüzdan:** başlangıç 100🪙, her yeni günde +25🪙 günlük bonus. NPC'lerin de basit cüzdanı var (150🪙).
+- **Fiyatlar:** çay 5, simit 8, tost 15, kırık bardak 10. Şükrü ara sıra %10-40 geçici zam yapar (duyurur).
+- **Çay (T tuşu / semaver):** para ister. Para yetmezse Şükrü **veresiyeye** yazar. Veresiye sınırı **40🪙**;
+  sınır dolunca Şükrü çay getirmez ve yakındaki NPC'ler borçluya laf atar.
+- **Borç ödeme:** Şükrü'nün yanına gidip E (önce kahvehane, sonra diğer alacaklılar).
+- **İflas koruması:** parası ve veresiye hakkı kalmayan oyuncu oyundan atılmaz; semaverde E ile **bulaşık yıkar** (+12🪙, önce borca sayılır, 60 sn bekleme).
+- **Bahisli masa:** masa kurulurken bahis seçilir (Yok / 3 / 5 / 10 çay; 1 çay = 5🪙). Bahsi artırmaya meyilli bir NPC
+  (en çok Cemal Reis) iki katına çıkarmayı teklif edebilir. Ödeme kural motorlarına dokunmadan, oyun sonuçlarından otomatik yapılır:
+  Okey — puanı en düşük olan öder, en yüksek alır · 101 — seride en yüksek toplam öder, en düşük alır ·
+  Tavla — her oyunda kaybeden öder (normal 1×, mars 2×, katmerli mars 3×) · Pişti — kaybeden takımın her üyesi öder, kazananlara bölünür.
+  Oyuncunun parası yetmezse kalan alacaklıya veresiye yazılır; NPC'ler ellerindeki kadarını öder.
+- **HUD:** sağ üstte bakiye (🪙) ve veresiye (📒); değişince "+/−" animasyonu.

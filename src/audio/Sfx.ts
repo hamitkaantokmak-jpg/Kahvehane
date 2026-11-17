@@ -3,7 +3,7 @@
  */
 export type SfxName =
   | 'glass' | 'tile' | 'dice' | 'card' | 'deal' | 'chair' | 'laugh' | 'bonk' | 'slap' | 'whoosh' | 'pop'
-  | 'grunt' | 'angry' | 'surprise' | 'win' | 'lose' | 'pisti' | 'click' | 'clap' | 'tableSlam' | 'pour' | 'snore' | 'tvChannel' | 'step';
+  | 'coin' | 'grunt' | 'angry' | 'surprise' | 'win' | 'lose' | 'pisti' | 'click' | 'clap' | 'tableSlam' | 'pour' | 'snore' | 'tvChannel' | 'step';
 
 export interface AudioSettings { master: number; sfx: number; ambience: number; muted: boolean }
 
@@ -167,6 +167,10 @@ export class Sfx {
       case 'pisti':
         [784, 988, 1175].forEach((f, i) => this.tone(f, 0.18, 'square', 0.08, i * 0.08));
         this.tone(1568, 0.4, 'triangle', 0.15, 0.24);
+        break;
+      case 'coin':
+        [1568, 2093, 2637].forEach((f, i) => this.tone(f * r(), 0.12, 'triangle', 0.12, i * 0.07));
+        this.noise(0.05, 6000, 2, 'bandpass', 0.15, 0.03);
         break;
       case 'click':
         this.tone(1200, 0.04, 'square', 0.05);

@@ -10,7 +10,8 @@ import type { NPC, NpcWorld } from '../npc/NPC';
 import type { Effects } from '../fx/Effects';
 import type { CameraRig } from '../player/CameraRig';
 import { sfx } from '../audio/Sfx';
-import { pickLine } from '../npc/personalities';
+import { pickLine, SUKRU_LINES } from '../npc/personalities';
+import type { EconomyController } from '../economy/EconomyController';
 
 export type EmoteId = 'wave' | 'laugh' | 'clap' | 'bellyDance' | 'slamTable' | 'laf' | 'drink';
 
@@ -36,6 +37,9 @@ export class Social {
   bonkCount = 0;
   /** Oyuncunun kaç kez karşılık olarak vurulduğu */
   timesBonked = 0;
+
+  /** Ekonomi (Aşama 2): çay parası, veresiye */
+  economy: EconomyController | null = null;
 
   constructor(
     private player: Character,
@@ -189,6 +193,18 @@ export class Social {
     if (!sukru) return;
     const target = forOther ? forOther.c : this.player;
     if (this.world.teaRequests.includes(target)) { this.toast('Çay zaten yolda!'); return; }
+    // ödeme: para yetmezse veresiye, veresiye sınırı doluysa Şükrü çay getirmez
+    if (this.economy) {
+      const r = this.economy.buy('tea');
+      if (!r.ok) {
+        this.player.anim.play('wave');
+        this.player.say('Şükrü! Bir çay!', 2);
+        setTimeout(() => { sukru.c.say(pickLine(SUKRU_LINES.noCredit), 3.2); sukru.c.anim.play('shrug'); }, 900);
+        this.toast('Veresiye defteri doldu! Borcunu Şükrü\'ye öde ya da semaverde bulaşık yıka.');
+        return;
+      }
+      if (r.onCredit > 0) setTimeout(() => sukru.c.say(pickLine(SUKRU_LINES.credit), 2.5), 2200);
+    }
     this.world.teaRequests.push(target);
     this.player.anim.play('wave');
     this.player.say(forOther ? `Şükrü! ${forOther.c.name}'ya bir çay!` : 'Şükrü! Bir çay!', 2);

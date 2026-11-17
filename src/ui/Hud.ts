@@ -49,6 +49,7 @@ export class Hud {
         <button data-a="interact" class="mb big">✋<small>Etkileşim</small></button>
       </div>
       <button class="menu-btn" id="menuBtn" title="Menü">☰</button>
+      <div class="money" id="money" title="Kahve parası (oyun içi sanal para)"><span class="coin">🪙 <b id="moneyBal">0</b></span><span class="debt" id="moneyDebt"></span></div>
       <div class="pause" id="pause"></div>`;
     this.prompt = this.root.querySelector('#prompt')!;
     this.toastEl = this.root.querySelector('#toast')!;
@@ -100,6 +101,22 @@ export class Hud {
     this.warnEl.classList.add('show');
     clearTimeout(this.warnTimer);
     this.warnTimer = window.setTimeout(() => this.warnEl.classList.remove('show'), seconds * 1000);
+  }
+
+  /** Bakiye ve veresiye göstergesi; değişince "+/-" animasyonu */
+  setMoney(balance: number, debt: number, delta: number) {
+    const m = this.root.querySelector('#money') as HTMLDivElement;
+    (m.querySelector('#moneyBal') as HTMLElement).textContent = String(balance);
+    const d = m.querySelector('#moneyDebt') as HTMLElement;
+    d.textContent = debt > 0 ? `📒 ${debt}` : '';
+    d.classList.toggle('over', debt >= 40);
+    if (delta) {
+      const f = document.createElement('div');
+      f.className = `money-delta ${delta > 0 ? 'up' : 'down'}`;
+      f.textContent = `${delta > 0 ? '+' : ''}${delta}🪙`;
+      m.appendChild(f);
+      setTimeout(() => f.remove(), 1600);
+    }
   }
 
   setPrompt(text: string | null) {
