@@ -34,6 +34,8 @@ export class Social {
   playerHasTea = false;
   private teaObj: THREE.Object3D | null = null;
   bonkCount = 0;
+  /** Oyuncunun kaç kez karşılık olarak vurulduğu */
+  timesBonked = 0;
 
   constructor(
     private player: Character,
@@ -197,6 +199,7 @@ export class Social {
   /** Oyuncu vurulunca (misilleme) */
   playerBonked(by: Character) {
     const p = this.player;
+    this.timesBonked++;
     sfx.play('bonk');
     this.effects.impactText(p.headWorld().add(new THREE.Vector3(0, 0.25, 0)), 'BONK!');
     this.effects.stars(p.model.head, 2.4);

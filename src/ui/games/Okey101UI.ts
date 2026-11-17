@@ -4,14 +4,14 @@ import { decideDraw101, planTurn101 } from '../../games/okey101/okey101Bot';
 import { createRng } from '../../games/common/rng';
 import { Tile, isJoker, isPair } from '../../games/common/tiles';
 import { GameHost, GameUI } from '../../tables/TableSession';
-import { h, btn } from '../dom';
+import { h, btn, later } from '../dom';
 import { Rack, tileEl } from './TileView';
 
 export class Okey101UI implements GameUI {
   readonly el: HTMLDivElement;
-  private s: K.Okey101State;
+  s: K.Okey101State;
   private rng = createRng();
-  private rack = new Rack();
+  rack = new Rack();
   private alive = true;
   private botTimer = 0;
   private status!: HTMLDivElement;
@@ -33,10 +33,16 @@ export class Okey101UI implements GameUI {
     this.btns = h('div', 'gbtns');
     this.el.append(this.board, this.tableEl, this.stageEl, this.status, this.rack.el, this.btns);
     this.rack.onSelect = () => this.renderButtons();
+    this.rack.onChange = () => this.sync3d();
     this.rack.sync(this.s.hands[0], this.s.ctx);
     this.rack.arrangeMelds(K.RULES_101);
     this.render();
     this.pump();
+  }
+
+  /** Test kancası: durum dışarıdan değiştirildikten sonra yeniden çiz ve bot döngüsünü sürdür. */
+  refresh() {
+    this.rack.sync(this.s.hands[0], this.s.ctx); this.render(); if ((this.s.phase as string) !== 'ended') this.pump();
   }
 
   destroy() {
@@ -52,7 +58,7 @@ export class Okey101UI implements GameUI {
     if (!this.alive || this.s.phase === 'ended' || this.host.isHuman(this.s.current)) return;
     const p = this.s.current;
     if (Math.random() < 0.3) this.host.react(p, 'think');
-    this.botTimer = window.setTimeout(() => this.botTurn(p), 800 + Math.random() * 600);
+    this.botTimer = later(() => this.botTurn(p), 800 + Math.random() * 600);
   }
 
   private async botTurn(p: number) {
@@ -72,7 +78,7 @@ export class Okey101UI implements GameUI {
         plan = planTurn101(K.view101(s, p), this.rng);
       }
       for (const a of plan) {
-        await new Promise((r) => (this.botTimer = window.setTimeout(r, 650)));
+        await new Promise<void>((r) => (this.botTimer = later(() => r(), 650)));
         if (!this.alive) return;
         if (a.type === 'open') {
           const total = K.open101(s, p, a.mode, a.groups);
@@ -83,7 +89,6 @@ export class Okey101UI implements GameUI {
         else {
           const r = K.discard101(s, p, a.tileId);
           this.host.sfx('tile');
-          this.host.table3d.drop('tile', 0xfff6e0, p, 4, 'front');
           if (r.penalty) this.host.react(p, 'angry', 'Eyvah, ceza yedim!');
         }
         this.render();
@@ -168,17 +173,25 @@ export class Okey101UI implements GameUI {
     this.after();
   }
 
-  private discard(id: number) {
+  private discard(id: number, confirmed = false) {
     const s = this.s;
     const err = K.canDiscard101(s, 0);
     if (err) { this.host.toast(err); return; }
     if (this.staged.some((g) => g.includes(id))) { this.host.toast('Bu taş hazırlanan perde.'); return; }
     const pen = K.discardPenalty(s, 0, id);
     const tile = s.hands[0].find((t) => t.id === id)!;
-    if (pen && !confirm(isJoker(tile, s.ctx) ? 'Okey atmak 101 ceza! Emin misin?' : 'Bu taş masadaki bir pere işlenebilir — atarsan 101 ceza! Emin misin?')) return;
+    if (pen && !confirmed) {
+      const m = h('div', 'modal penalty-modal');
+      m.innerHTML = `<div class="panel"><h3>⚠️ ${pen} ceza!</h3><p>${isJoker(tile, s.ctx) ? 'Okey atmak cezalıdır.' : 'Bu taş masadaki bir pere işlenebilir; atarsan ceza yazılır.'} Yine de atılsın mı?</p></div>`;
+      const row = h('div', 'row-btns');
+      row.appendChild(btn('Vazgeç', 'primary', () => m.remove()));
+      row.appendChild(btn('Yine de at', 'danger', () => { m.remove(); this.discard(id, true); }));
+      m.querySelector('.panel')!.appendChild(row);
+      this.el.appendChild(m);
+      return;
+    }
     const r = K.discard101(s, 0, id);
     this.host.sfx('tile');
-    this.host.table3d.drop('tile', 0xfff6e0, 0, 4, 'front');
     if (r.penalty) this.host.toast(`+${r.penalty} ceza yazıldı!`);
     this.staged = [];
     this.rack.selected.clear();
@@ -194,7 +207,13 @@ export class Okey101UI implements GameUI {
   }
 
   // ------------------------------------------------------------ çizim
+  private sync3d() {
+    const s = this.s;
+    this.host.table3d.syncOkey({ hands: [s.hands[0]], handCounts: s.hands.map((x) => x.length), rackOrder: this.rack.slots, deckCount: s.deck.length, deckIds: s.deck.map((t) => t.id), indicator: s.indicator, ctx: s.ctx, discards: s.discards, melds: s.table.map((m) => ({ owner: m.owner, tiles: m.tiles })) });
+  }
+
   private render() {
+    this.sync3d();
     const s = this.s;
     const names = this.host.names;
     this.rack.disabledIds = new Set(this.staged.flat());

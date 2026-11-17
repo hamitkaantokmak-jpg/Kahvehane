@@ -4,16 +4,16 @@ import { decideOkey } from '../../games/okey/okeyBot';
 import { createRng } from '../../games/common/rng';
 import { isJoker } from '../../games/common/tiles';
 import { GameHost, GameUI } from '../../tables/TableSession';
-import { h, btn } from '../dom';
+import { h, btn, later } from '../dom';
 import { Rack, tileEl } from './TileView';
 
 const KIND_TR: Record<string, string> = { normal: 'normal bitti', okey: 'okey atarak bitti', pairs: 'çiftten bitti', pairsOkey: 'çiftten okey atarak bitti', deckEmpty: 'deste bitti' };
 
 export class OkeyUI implements GameUI {
   readonly el: HTMLDivElement;
-  private s: O.OkeyState;
+  s: O.OkeyState;
   private rng = createRng();
-  private rack = new Rack();
+  rack = new Rack();
   private alive = true;
   private botTimer = 0;
   private status!: HTMLDivElement;
@@ -37,7 +37,12 @@ export class OkeyUI implements GameUI {
     this.btns = h('div', 'gbtns');
     this.el.append(this.board, this.status, this.rack.el, this.btns);
     this.rack.onSelect = () => this.renderButtons();
-    this.rack.onChange = () => {};
+    this.rack.onChange = () => this.sync3d();
+  }
+
+  /** Test kancası: durum dışarıdan değiştirildikten sonra yeniden çiz ve bot döngüsünü sürdür. */
+  refresh() {
+    this.rack.sync(this.s.hands[0], this.s.ctx); this.render(); if ((this.s.phase as string) !== 'ended') this.pump();
   }
 
   destroy() {
@@ -53,7 +58,7 @@ export class OkeyUI implements GameUI {
     clearTimeout(this.botTimer);
     const p = this.s.current;
     if (Math.random() < 0.25) this.host.react(p, 'think');
-    this.botTimer = window.setTimeout(() => this.botStep(p), 700 + Math.random() * 600);
+    this.botTimer = later(() => this.botStep(p), 700 + Math.random() * 600);
   }
 
   private botStep(p: number) {
@@ -71,7 +76,6 @@ export class OkeyUI implements GameUI {
       else if (a.type === 'discard') {
         const t = O.discard(this.s, p, a.tileId);
         this.host.sfx('tile');
-        this.host.table3d.drop('tile', 0xfff6e0, p, 4, 'front');
         if (isJoker(t, this.s.ctx)) this.host.react(p, 'surprise', 'Okey attım, hata!');
         else if (Math.random() < 0.12) this.host.react(p, 'slam');
         else if (Math.random() < 0.3) this.host.react(p, 'play');
@@ -89,7 +93,7 @@ export class OkeyUI implements GameUI {
     this.render();
     if ((this.s.phase as string) === 'ended') { this.onHandEnd(); return; }
     if (this.s.phase === 'discard' && this.s.current === p) {
-      this.botTimer = window.setTimeout(() => this.botStep(p), 600 + Math.random() * 500);
+      this.botTimer = later(() => this.botStep(p), 600 + Math.random() * 500);
       return;
     }
     this.pump();
@@ -118,7 +122,6 @@ export class OkeyUI implements GameUI {
     if (!this.myTurn() || this.s.phase !== 'discard') { this.host.toast(this.s.phase === 'draw' ? 'Önce taş çek (desteden ya da soldan).' : 'Sıra sende değil.'); return; }
     const t = O.discard(this.s, 0, id);
     this.host.sfx('tile');
-    this.host.table3d.drop('tile', 0xfff6e0, 0, 4, 'front');
     if (isJoker(t, this.s.ctx)) this.host.toast('Okey attın! Rakipler buna çok sevinir.');
     this.rack.selected.clear();
     this.rack.highlight = null;
@@ -142,7 +145,13 @@ export class OkeyUI implements GameUI {
   }
 
   // ------------------------------------------------------------ çizim
+  private sync3d() {
+    const s = this.s;
+    this.host.table3d.syncOkey({ hands: [s.hands[0]], handCounts: s.hands.map((x) => x.length), rackOrder: this.rack.slots, deckCount: s.deck.length, deckIds: s.deck.map((t) => t.id), indicator: s.indicator, ctx: s.ctx, discards: s.discards });
+  }
+
   private render() {
+    this.sync3d();
     const s = this.s;
     const names = this.host.names;
     this.rack.sync(s.hands[0], s.ctx);

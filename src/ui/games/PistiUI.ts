@@ -3,7 +3,7 @@ import * as P from '../../games/pisti/pisti';
 import { choosePistiCard } from '../../games/pisti/pistiBot';
 import { createRng } from '../../games/common/rng';
 import { GameHost, GameUI } from '../../tables/TableSession';
-import { h, btn } from '../dom';
+import { h, btn, later } from '../dom';
 
 function cardEl(c: P.Card | null, opts: { back?: boolean; small?: boolean } = {}): HTMLDivElement {
   const el = h('div', `card${opts.back ? ' back' : ''}${opts.small ? ' small' : ''}`);
@@ -20,7 +20,7 @@ function cardEl(c: P.Card | null, opts: { back?: boolean; small?: boolean } = {}
 
 export class PistiUI implements GameUI {
   readonly el: HTMLDivElement;
-  private s: P.PistiState;
+  s: P.PistiState;
   private rng = createRng();
   private alive = true;
   private timer = 0;
@@ -45,6 +45,11 @@ export class PistiUI implements GameUI {
     this.pump();
   }
 
+  /** Test kancası: durum dışarıdan değiştirildikten sonra yeniden çiz ve bot döngüsünü sürdür. */
+  refresh() {
+    this.render(); this.pump();
+  }
+
   destroy() {
     this.alive = false;
     clearTimeout(this.timer);
@@ -61,7 +66,7 @@ export class PistiUI implements GameUI {
   private pump() {
     if (!this.alive || this.s.phase !== 'play' || this.host.isHuman(this.s.current)) return;
     const p = this.s.current;
-    this.timer = window.setTimeout(() => this.play(p, choosePistiCard(P.viewPisti(this.s, p), this.rng)), 750 + Math.random() * 500);
+    this.timer = later(() => this.play(p, choosePistiCard(P.viewPisti(this.s, p), this.rng)), 750 + Math.random() * 500);
   }
 
   private play(p: number, cardId: number) {
@@ -70,9 +75,7 @@ export class PistiUI implements GameUI {
     const handBefore = s.round;
     const ev = P.playCard(s, p, cardId);
     this.host.sfx('card');
-    this.host.table3d.drop('card', 0xffffff, p, this.opts.players, 'center');
     if (ev) {
-      this.host.table3d.sweepTo(p, this.opts.players);
       if (ev.pisti) {
         this.splash(ev.pisti === 20 ? 'ÇİFT PİŞTİ! +20' : 'PİŞTİ! +10');
         this.host.sfx('pisti');
@@ -85,7 +88,7 @@ export class PistiUI implements GameUI {
     }
     if (s.round !== handBefore && s.phase === 'play') { this.host.sfx('deal'); }
     this.render(ev?.player);
-    if (s.phase !== 'play') { this.timer = window.setTimeout(() => this.onHandEnd(), 900); return; }
+    if (s.phase !== 'play') { this.timer = later(() => this.onHandEnd(), 900); return; }
     this.pump();
   }
 
@@ -95,7 +98,13 @@ export class PistiUI implements GameUI {
     setTimeout(() => d.remove(), 1600);
   }
 
+  private sync3d() {
+    const s = this.s;
+    this.host.table3d.syncPisti({ players: this.opts.players, hands: [s.hands[0]], handCounts: s.hands.map((x) => x.length), pile: s.pile, hiddenCount: s.hiddenCount, deckCount: s.deck.length, captured: s.captured.map((c) => c.length), capturedIds: s.captured });
+  }
+
   private render(capturedBy?: number) {
+    this.sync3d();
     const s = this.s;
     const n = this.host.names;
     const t = P.tally(s);

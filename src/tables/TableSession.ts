@@ -2,7 +2,6 @@
  * Masa oturumu: oyuncu oturduktan sonra oyun seçimi → eksik koltuklara bot NPC yerleştirme →
  * oyun arayüzü → masadan kalkış. Oyun arayüzleri bu sınıfı GameHost olarak kullanır.
  */
-import * as THREE from 'three';
 import type { Game } from '../core/Game';
 import type { Seat } from '../world/Kahvehane';
 import type { NPC } from '../npc/NPC';
@@ -14,6 +13,7 @@ import { OkeyUI } from '../ui/games/OkeyUI';
 import { Okey101UI } from '../ui/games/Okey101UI';
 import { TavlaUI } from '../ui/games/TavlaUI';
 import { PistiUI } from '../ui/games/PistiUI';
+import { TableView3D } from './TableView3D';
 
 export type ReactKind = 'think' | 'happy' | 'angry' | 'win' | 'lose' | 'goodMove' | 'slam' | 'play' | 'surprise';
 
@@ -27,7 +27,7 @@ export interface GameHost {
   matchFinished(humanWon: boolean | null): void;
   exit(): void;
   /** 3D masaya taş/kart koyma (görsel geri bildirim) */
-  table3d: TableProps3D;
+  table3d: TableView3D;
 }
 
 export interface GameUI {
@@ -48,15 +48,15 @@ export class TableSession implements GameHost {
   names: string[] = [];
   gameId: GameId = 'okey';
   private participants: (NPC | 'player')[] = [];
-  private ui: GameUI | null = null;
+  ui: GameUI | null = null;
   private exitConfirm: HTMLDivElement | null = null;
-  readonly table3d: TableProps3D;
+  readonly table3d: TableView3D;
   options: GameOptions = { okey101Hands: 3, tavlaKatmerli: true, tavlaTarget: 5, pistiTarget: 151 };
 
-  constructor(private game: Game, private seat: Seat) {
+  constructor(private game: Game, readonly seat: Seat) {
     this.root = h('div', 'game-root');
     game.overlay.appendChild(this.root);
-    this.table3d = new TableProps3D(seat);
+    this.table3d = new TableView3D(seat);
     this.showSelect();
   }
 
@@ -71,6 +71,7 @@ export class TableSession implements GameHost {
     for (const gid of this.table.games) {
       const m = GAME_META[gid];
       const card = h('div', 'game-card');
+      card.dataset.game = gid;
       card.innerHTML = `<div class="gc-title">${m.name}</div><div class="gc-desc">${m.description}</div><div class="gc-players">${m.players} oyuncu</div>`;
       const opts = h('div', 'gc-opts');
       if (gid === 'okey101') {
@@ -155,11 +156,13 @@ export class TableSession implements GameHost {
     sfx.play('pop');
     this.names = this.participants.map((p) => (p === 'player' ? 'Sen' : p.c.name));
     this.root.innerHTML = '';
+    this.table.props.visible = false;
+    this.table3d.clear();
+    // birinci şahıs masa görünümü: oyuncunun kendi modeli kamerayı kapatmasın
+    this.game.player.model.root.visible = false;
     const ui = this.createUI(gid);
     this.ui = ui;
     this.root.appendChild(ui.el);
-    this.table.props.visible = false;
-    this.table3d.clear();
   }
 
   private createUI(gid: GameId): GameUI {
@@ -258,6 +261,7 @@ export class TableSession implements GameHost {
   }
 
   private releaseBots() {
+    this.game.player.model.root.visible = true;
     for (const p of this.participants) if (p !== 'player') p.releaseFromGame();
     this.participants = [];
   }
@@ -290,63 +294,5 @@ export class TableSession implements GameHost {
   update(dt: number) {
     this.ui?.update?.(dt);
     this.table3d.update(dt);
-  }
-}
-
-/**
- * Masa üzerinde oyunun 3D yansıması: oynanan taş/kart/pul masada gerçekten belirir.
- * (Oyun arayüzü DOM'da; 3D masa oyuncunun hamlelerini görsel olarak yansıtır.)
- */
-export class TableProps3D {
-  private group: THREE.Group;
-  private items: { obj: THREE.Object3D; target: THREE.Vector3; t: number }[] = [];
-  constructor(private seat: Seat) {
-    this.group = seat.table.live;
-  }
-  clear() {
-    this.group.clear();
-    this.items = [];
-  }
-  /** Bir oyuncunun önüne / ortaya küçük bir nesne bırak. `from` 0..n oyuncu, -1 orta. */
-  drop(kind: 'tile' | 'card' | 'checker' | 'die', color: number, player: number, players: number, to: 'center' | 'front' = 'center') {
-    const t = this.seat.table;
-    const geo = kind === 'tile' ? new THREE.BoxGeometry(0.05, 0.015, 0.07) : kind === 'card' ? new THREE.BoxGeometry(0.07, 0.004, 0.1) : kind === 'die' ? new THREE.BoxGeometry(0.035, 0.035, 0.035) : new THREE.CylinderGeometry(0.025, 0.025, 0.012, 12);
-    const mat = new THREE.MeshToonMaterial({ color });
-    const m = new THREE.Mesh(geo, mat);
-    // oyuncu koltuğunun yönü
-    const seatIdx = (this.seat.index + (t.seats.length === 2 ? player : players === 2 ? player * 2 : player)) % t.seats.length;
-    const s = t.seats[seatIdx];
-    const dir = new THREE.Vector3(s.pos.x - t.center.x, 0, s.pos.z - t.center.z).normalize();
-    const start = dir.clone().multiplyScalar(0.4).setY(0.95);
-    const end = to === 'center'
-      ? new THREE.Vector3((Math.random() - 0.5) * 0.18, 0.79 + this.items.length * 0.0015, (Math.random() - 0.5) * 0.18)
-      : dir.clone().multiplyScalar(0.28).add(new THREE.Vector3((Math.random() - 0.5) * 0.12, 0.79, (Math.random() - 0.5) * 0.06));
-    m.position.copy(start);
-    m.rotation.y = Math.random() * Math.PI;
-    this.group.add(m);
-    this.items.push({ obj: m, target: end, t: 0 });
-    if (this.items.length > 40) {
-      const old = this.items.shift()!;
-      this.group.remove(old.obj);
-    }
-  }
-  sweepTo(player: number, players: number) {
-    // ortadaki nesneleri bir oyuncuya doğru süpür ve kaldır
-    const t = this.seat.table;
-    const seatIdx = (this.seat.index + (t.seats.length === 2 ? player : players === 2 ? player * 2 : player)) % t.seats.length;
-    const s = t.seats[seatIdx];
-    const dir = new THREE.Vector3(s.pos.x - t.center.x, 0, s.pos.z - t.center.z).normalize().multiplyScalar(0.55);
-    for (const it of this.items) { it.target = dir.clone().setY(0.8); it.t = 0; it.obj.userData.die = true; }
-  }
-  update(dt: number) {
-    for (const it of this.items) {
-      it.t = Math.min(1, it.t + dt * 3);
-      const k = it.t;
-      it.obj.position.lerp(it.target, k);
-      if (k < 1) it.obj.position.y += Math.sin(k * Math.PI) * 0.05;
-    }
-    const dead = this.items.filter((i) => i.obj.userData.die && i.t >= 1);
-    for (const d of dead) this.group.remove(d.obj);
-    this.items = this.items.filter((i) => !dead.includes(i));
   }
 }

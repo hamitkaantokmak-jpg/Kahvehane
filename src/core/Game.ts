@@ -45,6 +45,8 @@ export class Game {
   private fpsFrames = 0;
   private fpsTime = 0;
   fps = 0;
+  /** Oyun zamanı çarpanı (test için ?gspeed=3) */
+  timeScale = (() => { try { const v = Number(new URLSearchParams(location.search).get('gspeed')); return v > 0 ? v : 1; } catch { return 1; } })();
   /** test/hata ayıklama için */
   frame = 0;
 
@@ -176,7 +178,7 @@ export class Game {
   }
 
   private tick() {
-    const dt = Math.min(0.05, this.clock.getDelta());
+    const dt = Math.min(0.05, this.clock.getDelta()) * this.timeScale;
     this.frame++;
     this.fpsFrames++;
     this.fpsTime += dt;
@@ -349,8 +351,9 @@ export class Game {
     this.world.reservedTable = seat.table.id;
     // kamera: oyuncunun arkasından masaya bakış
     const back = new THREE.Vector3(-Math.sin(seat.yaw), 0, -Math.cos(seat.yaw));
-    const camPos = seat.pos.clone().addScaledVector(back, 1.9).add(new THREE.Vector3(0, 2.75, 0));
-    const look = seat.table.center.clone().add(new THREE.Vector3(0, 0.35, 0)).addScaledVector(back, 0.35);
+    // oyuncunun başının üstünden masaya bakış; masa ekranın üst yarısında kalsın (alt yarıda arayüz var)
+    const camPos = seat.pos.clone().addScaledVector(back, 0.15).add(new THREE.Vector3(0, 1.8, 0));
+    const look = seat.table.center.clone().addScaledVector(back, -0.25).add(new THREE.Vector3(0, 0.3, 0));
     this.rig.setFixed(camPos, look);
     this.session = new TableSession(this, seat);
   }

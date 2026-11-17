@@ -292,7 +292,7 @@ export class NPC {
     this.mode = 'react';
     this.timer = strong ? 3.4 : 2.0;
     // sinirli karakterler karşılık verir
-    const retaliate = this.p.temper >= 0.6 && this.bonkCount >= 2 && Math.random() < 0.75;
+    const retaliate = this.p.temper >= 0.6 && this.bonkCount >= 2 && (this.p.temper >= 0.85 || Math.random() < 0.75);
     this.retaliatePending = retaliate;
   }
   private retaliatePending = false;

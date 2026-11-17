@@ -3,13 +3,13 @@ import * as V from '../../games/tavla/tavla';
 import { chooseSequence } from '../../games/tavla/tavlaBot';
 import { createRng } from '../../games/common/rng';
 import { GameHost, GameUI } from '../../tables/TableSession';
-import { h, btn } from '../dom';
+import { h, btn, later } from '../dom';
 
 const PIPS = ['', '⚀', '⚁', '⚂', '⚃', '⚄', '⚅'];
 
 export class TavlaUI implements GameUI {
   readonly el: HTMLDivElement;
-  private s: V.TavlaState;
+  s: V.TavlaState;
   private rng = createRng();
   private alive = true;
   private timer = 0;
@@ -20,6 +20,8 @@ export class TavlaUI implements GameUI {
   private status!: HTMLDivElement;
   private btns!: HTMLDivElement;
   private rolling = false;
+  /** Test kancası: sonraki zarı sabitle */
+  forceDice: [number, number] | null = null;
 
   constructor(private host: GameHost, opts: V.TavlaOptions) {
     this.el = h('div', 'gui tavla');
@@ -34,6 +36,11 @@ export class TavlaUI implements GameUI {
     this.render();
   }
 
+  /** Test kancası: durum dışarıdan değiştirildikten sonra yeniden çiz ve bot döngüsünü sürdür. */
+  refresh() {
+    this.render();
+  }
+
   destroy() {
     this.alive = false;
     clearTimeout(this.timer);
@@ -43,12 +50,10 @@ export class TavlaUI implements GameUI {
   private openingRoll() {
     const [a, b] = V.rollOpening(this.s, this.rng);
     this.host.sfx('dice');
-    this.host.table3d.drop('die', 0xffffff, 0, 2, 'center');
-    this.host.table3d.drop('die', 0xffffff, 1, 2, 'center');
     this.host.toast(`Açılış: Sen ${a} — ${this.host.names[1]} ${b}. ${a > b ? 'Sen başlıyorsun!' : `${this.host.names[1]} başlıyor.`}`);
     if (a < b) this.host.react(1, 'happy');
     this.render();
-    this.timer = window.setTimeout(() => this.next(), 900);
+    this.timer = later(() => this.next(), 900);
   }
 
   private next() {
@@ -63,21 +68,21 @@ export class TavlaUI implements GameUI {
     if (this.rolling || this.s.phase !== 'roll' || this.s.current !== 0) return;
     this.rolling = true;
     this.host.sfx('dice');
-    this.host.table3d.drop('die', 0xffffff, 0, 2, 'center');
     // zar animasyonu
     let k = 0;
     const anim = () => {
       const d = this.side.querySelector('.dice');
       if (d) d.innerHTML = `<span class="die rolling">${PIPS[1 + Math.floor(Math.random() * 6)]}</span><span class="die rolling">${PIPS[1 + Math.floor(Math.random() * 6)]}</span>`;
-      if (++k < 6) this.timer = window.setTimeout(anim, 70);
+      if (++k < 6) this.timer = later(anim, 70);
       else {
         this.rolling = false;
-        V.roll(this.s, this.rng);
+        V.roll(this.s, this.rng, this.forceDice ?? undefined);
+        this.forceDice = null;
         this.undoStack = [JSON.stringify(this.snapshot())];
         if (this.s.dice[0] === this.s.dice[1]) this.host.toast(`Çift ${this.s.dice[0]}! Dört hamle.`);
         if (V.legalMoves(this.s).length === 0) {
           this.host.toast('Oynanacak hamle yok, sıra geçiyor.');
-          this.timer = window.setTimeout(() => { V.endTurn(this.s); this.next(); }, 1200);
+          this.timer = later(() => { V.endTurn(this.s); this.next(); }, 1200);
         }
         this.render();
       }
@@ -121,13 +126,12 @@ export class TavlaUI implements GameUI {
       const m = V.move(s, from, to);
       this.host.sfx(m.hit ? 'slap' : 'tile');
       if (m.hit) { this.host.react(1, 'angry', 'Kırdın pulumu!'); this.host.react(0, 'slam'); }
-      if (m.to === 'off') this.host.table3d.drop('checker', 0xf5f0e6, 0, 2, 'front');
     } catch (e) { this.host.toast((e as Error).message); }
     this.sel = null;
     this.render();
-    if (s.phase === 'gameOver' || s.phase === 'matchOver') { this.timer = window.setTimeout(() => this.onGameEnd(), 600); return; }
+    if (s.phase === 'gameOver' || s.phase === 'matchOver') { this.timer = later(() => this.onGameEnd(), 600); return; }
     if (s.phase === 'move' && s.remaining.length === 0) {
-      this.timer = window.setTimeout(() => { if (this.s.phase === 'move' && this.s.current === 0) { V.endTurn(this.s); this.next(); } }, 700);
+      this.timer = later(() => { if (this.s.phase === 'move' && this.s.current === 0) { V.endTurn(this.s); this.next(); } }, 700);
     }
   }
 
@@ -138,7 +142,6 @@ export class TavlaUI implements GameUI {
     if (!this.alive) return;
     V.roll(s, this.rng);
     this.host.sfx('dice');
-    this.host.table3d.drop('die', 0xffffff, 1, 2, 'center');
     if (s.dice[0] === s.dice[1] && Math.random() < 0.6) this.host.react(1, 'happy', `Çift ${s.dice[0]}! Gördün mü?`);
     this.render();
     await this.delay(700);
@@ -157,10 +160,16 @@ export class TavlaUI implements GameUI {
     this.render();
   }
 
-  private delay(ms: number) { return new Promise<void>((r) => (this.timer = window.setTimeout(r, ms))); }
+  private delay(ms: number) { return new Promise<void>((r) => (this.timer = later(() => r(), ms))); }
 
   // ------------------------------------------------------------ çizim
+  private sync3d() {
+    const s = this.s;
+    this.host.table3d.syncTavla({ points: s.points, bar: s.bar, off: s.off, dice: s.dice });
+  }
+
   private render() {
+    this.sync3d();
     const s = this.s;
     const legal = s.current === 0 && s.phase === 'move' ? V.legalMoves(s) : [];
     const sources = new Set(legal.map((m) => String(m.from)));
@@ -191,7 +200,7 @@ export class TavlaUI implements GameUI {
       row.appendChild(hh);
     };
     half(top, [12, 13, 14, 15, 16, 17], true);
-    const barTop = h('div', `bar${sources.has('bar') ? ' src' : ''}${this.sel === 'bar' ? ' sel' : ''}`);
+    const barTop = h('div', 'bar');
     for (let k = 0; k < s.bar[1]; k++) barTop.appendChild(h('div', 'chk b'));
     top.appendChild(barTop);
     half(top, [18, 19, 20, 21, 22, 23], true);

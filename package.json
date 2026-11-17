@@ -8,12 +8,14 @@
     "build": "tsc --noEmit && vite build",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
-    "preview": "vite preview --host"
+    "preview": "vite preview --host",
+    "e2e": "playwright test --trace off"
   },
   "dependencies": {
     "three": "^0.180.0"
   },
   "devDependencies": {
+    "@playwright/test": "^1.63.0",
     "@types/three": "^0.180.0",
     "typescript": "5.9",
     "vite": "^7.3.8",
