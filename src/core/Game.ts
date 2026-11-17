@@ -20,6 +20,7 @@ import { loadSettings, saveSettings, Settings, loadStats, saveStats, Stats } fro
 import { TableSession } from '../tables/TableSession';
 import { DartSession } from '../tables/DartSession';
 import { HorseRaceTV } from '../world/HorseRaceTV';
+import { ChaosEvents } from '../world/ChaosEvents';
 import { OcclusionFader } from '../player/OcclusionFader';
 import { ChaosDirector } from '../chaos/ChaosDirector';
 import { BrawlController } from '../npc/BrawlController';
@@ -49,12 +50,13 @@ export class Game {
   stats: Stats;
   mode: 'explore' | 'seated' = 'explore';
   /** Oyun katmanı rastgeleliği (saf modüllere enjekte edilir) */
-  readonly rng: Rng = createRng((performance.now() * 1000) >>> 0);
+  rng: Rng = createRng((performance.now() * 1000) >>> 0);
   chaos!: ChaosDirector;
   brawls!: BrawlController;
   private overflowCooldown = 0;
   economy!: EconomyController;
   race!: HorseRaceTV;
+  chaosEvents!: ChaosEvents;
   private teaseT = 20;
   private raiseT = 90;
   session: TableSession | DartSession | null = null;
@@ -121,7 +123,7 @@ export class Game {
     };
     this.world.onPlayerBonked = (by) => this.social.playerBonked(by);
     this.chaos = new ChaosDirector(this.rng, this.settings.chaosIntensity);
-    this.chaos.available = new Set(['brawl']);
+    this.chaos.available = new Set(['brawl', 'tvGoal', 'powerCut', 'cat', 'tableFlip', 'objection', 'kibitz']);
     this.world.onTension = (src) => this.chaos.add(src);
     this.world.requestBrawl = (a, b) => this.brawls.start(a, b);
 
@@ -148,6 +150,7 @@ export class Game {
     this.economy = new EconomyController(new LocalEconomyStore(), this.npcs.map((n) => n.id));
     this.social.economy = this.economy;
     this.race = new HorseRaceTV(this);
+    this.chaosEvents = new ChaosEvents(this);
     this.social.now = () => this.clockTime;
     // çay fırlatma (Aşama 3)
     this.social.teaEnabled = () => this.settings.teaThrow !== 'off';
@@ -318,7 +321,13 @@ export class Game {
 
   private updateChaos(dt: number) {
     const u = this.chaos.update(dt);
-    if (u.event?.id === 'brawl') this.startDirectorBrawl();
+    switch (u.event?.id) {
+      case 'brawl': this.startDirectorBrawl(); break;
+      case 'tvGoal': this.chaosEvents.tvGoal(); break;
+      case 'powerCut': this.chaosEvents.powerCut(); break;
+      case 'cat': this.chaosEvents.catVisit(); break;
+    }
+    this.chaosEvents.update(dt);
     this.brawls.update(dt);
     this.overflowCooldown -= dt;
     if (u.overflow && this.overflowCooldown <= 0) {

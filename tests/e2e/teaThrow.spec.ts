@@ -33,7 +33,7 @@ test('Çay fırlatma: ücret, isabet, çaylı yüz, art arda zam, solma; masada 
   await page.keyboard.press('KeyG');
   await page.waitForFunction(() => (window as unknown as W).__game.economy.balance === 65);
   // leke solar ve kaybolur
-  await page.evaluate(() => { (window as unknown as W).__game.npcs.find((n: any) => n.id === 'nihat').c.stain.remaining = 1.5; });
+  await page.evaluate(() => { (window as unknown as W).__game.npcs.find((n: any) => n.id === 'nihat').c.stain.remaining = 0.3; });
   await page.waitForFunction(() => !(window as unknown as W).__game.npcs.find((n: any) => n.id === 'nihat').c.model.stain.visible, null, { timeout: 30_000 });
   // ayar kapalıyken fırlatılamaz
   await page.evaluate(() => { const g = (window as unknown as W).__game; g.applySettings({ ...g.settings, teaThrow: 'off' }); g.social.throwState.cooldown = 0; });

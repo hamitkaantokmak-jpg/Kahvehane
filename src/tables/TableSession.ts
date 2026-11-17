@@ -14,6 +14,8 @@ import { Okey101UI } from '../ui/games/Okey101UI';
 import { TavlaUI } from '../ui/games/TavlaUI';
 import { PistiUI } from '../ui/games/PistiUI';
 import { TableView3D } from './TableView3D';
+import * as THREE from 'three';
+import { objectionOutcome, NoRepeatPicker, nextKibitzDelay, shouldFlipTable } from '../chaos/eventRules';
 import { STAKES, stakeCoins, okeyOutcome, okey101Outcome, pistiOutcome, tavlaOutcome, wantsRaise, Outcome, AppliedTransfer } from '../economy/Betting';
 
 export type ReactKind = 'think' | 'happy' | 'angry' | 'win' | 'lose' | 'goodMove' | 'slam' | 'play' | 'surprise';
@@ -199,11 +201,107 @@ export class TableSession implements GameHost {
     this.ui = ui;
     this.root.appendChild(ui.el);
     this.addThrowButton();
+    this.addObjectionButton();
+    this.kibitzT = nextKibitzDelay(this.game.rng);
     this.settledGames.clear();
     if (this.options.stake > 0) {
       this.game.hud.toast(`💰 Bahisli masa: kaybeden ${this.options.stake} çay (${stakeCoins(this.options.stake)}🪙) öder.`, 3.5);
       setTimeout(() => this.offerRaise(), 1800);
     }
+  }
+
+  /** İtiraz: bota haksızlık iddiası — gerçek hile tespiti yok; yalnızca replik ve gerginlik */
+  private addObjectionButton() {
+    const b = btn('🙋 İtiraz!', 'small objection-btn', () => {
+      const old = this.root.querySelector('.objection-pick');
+      if (old) { old.remove(); return; }
+      const pick = h('div', 'throw-pick objection-pick');
+      for (const p of this.participants) {
+        if (p === 'player') continue;
+        pick.appendChild(btn(`→ ${p.c.name}`, 'small', () => { pick.remove(); this.object(p); }));
+      }
+      this.root.appendChild(pick);
+    });
+    this.root.appendChild(b);
+  }
+
+  /** İtiraz et (test kancası da) */
+  object(npc: NPC): boolean {
+    const chaos = this.game.chaos;
+    if ((chaos.state.cooldowns.objection ?? 0) > 0) { this.toast('Az önce itiraz ettin, biraz sabır!'); return false; }
+    const def = chaos.trigger('objection')!;
+    const out = objectionOutcome(npc.p.temper, this.game.rng());
+    chaos.add(out.tension - def.tension);
+    this.game.player.say(pickLine(['İtiraz ediyorum! O taş nereden çıktı?', 'Hakem! Burada bir iş var!', 'Bu nasıl hamle, göreyim kartları!']), 2.5);
+    setTimeout(() => {
+      npc.c.say(pickLine(npc.p.lines.objectionReply), 3);
+      npc.c.anim.play(out.reply === 'angry' ? 'slamTable' : out.reply === 'mock' ? 'laugh' : 'shrug');
+      if (out.reply === 'angry') setTimeout(() => sfx.play('tableSlam'), 350);
+      if (out.reply === 'mock') sfx.play('laugh', npc.c.spec.voicePitch);
+    }, 1100);
+    this.lastObjection = out.reply;
+    return true;
+  }
+  lastObjection: string | null = null;
+
+  // ------------------------------------------------------------------ kibitz (izleyici yorumları)
+  private kibitzer: NPC | null = null;
+  private kibitzT = 10;
+  private kibitzPickers = new Map<string, NoRepeatPicker<string>>();
+  kibitzLines: string[] = [];
+
+  private updateKibitz(dt: number) {
+    if (!this.ui || !this.game.settings.kibitz) { this.releaseKibitzer(); return; }
+    const k = this.kibitzer;
+    if (k && (k.inBrawl || !['returning', 'wander', 'kibitz'].includes(k.mode as string))) this.kibitzer = null;
+    this.kibitzT -= dt;
+    if (this.kibitzT > 0) return;
+    this.kibitzT = nextKibitzDelay(this.game.rng);
+    if (!this.kibitzer) {
+      const free = this.game.npcs.filter((n) => !n.inBrawl && n.id !== 'sukru' && ['idle', 'wander', 'tv', 'chat', 'seated'].includes(n.mode) && n.c.seat?.table !== this.table);
+      free.sort((a, b) => a.c.pos.distanceTo(this.table.center) - b.c.pos.distanceTo(this.table.center));
+      const n = free[0];
+      if (!n) return;
+      // oyuncunun arkasında durup izler
+      if (n.c.seated) n.leaveSeat();
+      n.releaseReservations();
+      const back = new THREE.Vector3(-Math.sin(this.seat.yaw), 0, -Math.cos(this.seat.yaw));
+      const spot = this.seat.pos.clone().addScaledVector(back, 0.9).add(new THREE.Vector3(0.5, 0, 0.3));
+      n.mode = 'wander';
+      n.c.walkTo(this.game.nav, spot.x, spot.z, () => { n.c.faceTowards(this.table.center); }, 1.3);
+      (n as unknown as { timer: number }).timer = 999;
+      this.kibitzer = n;
+      return;
+    }
+    const n = this.kibitzer;
+    if (n.c.isWalking) return;
+    let picker = this.kibitzPickers.get(n.id);
+    if (!picker) { picker = new NoRepeatPicker(n.p.lines.kibitz, this.game.rng); this.kibitzPickers.set(n.id, picker); }
+    const line = picker.next();
+    this.kibitzLines.push(line);
+    n.c.faceTowards(this.table.center);
+    n.c.say(line, 3);
+    n.c.anim.play(this.game.rng() < 0.5 ? 'point' : 'talk');
+  }
+
+  private releaseKibitzer() {
+    if (this.kibitzer && this.kibitzer.mode === 'wander') (this.kibitzer as unknown as { timer: number }).timer = 1;
+    this.kibitzer = null;
+  }
+
+  /** Masa devirme: Rıza Dayı gibi çok sinirli biri okeyi kaybederse (görsel/sosyal; sonuç geçerli) */
+  private maybeFlipTable() {
+    if (this.gameId !== 'okey' && this.gameId !== 'okey101') return;
+    const s = (this.ui as unknown as { s: { scores?: number[]; totals: number[] } }).s;
+    const winner = this.gameId === 'okey'
+      ? s.scores!.indexOf(Math.max(...s.scores!))
+      : s.totals.indexOf(Math.min(...s.totals));
+    this.participants.forEach((p, i) => {
+      if (p === 'player') return;
+      if (shouldFlipTable({ temper: p.p.temper, lostMatch: i !== winner, game: this.gameId, anger: p.anger }, this.game.rng())) {
+        setTimeout(() => this.game.chaosEvents.tableFlip(this.table, p), 1600);
+      }
+    });
   }
 
   /** Masada çay fırlatma: yalnızca görsel/sosyal, oyunu etkilemez */
@@ -360,6 +458,7 @@ export class TableSession implements GameHost {
   matchFinished(humanWon: boolean | null) {
     if (humanWon !== null) this.game.recordResult(this.gameId, humanWon);
     if (this.gameId !== 'tavla') this.settleMatch();
+    this.maybeFlipTable();
     // diğer katılımcılar tepki verir
     this.participants.forEach((p, i) => {
       if (p === 'player') return;
@@ -380,6 +479,7 @@ export class TableSession implements GameHost {
   }
 
   private releaseBots() {
+    this.releaseKibitzer();
     this.game.player.model.root.visible = true;
     for (const p of this.participants) if (p !== 'player') p.releaseFromGame();
     this.participants = [];
@@ -413,6 +513,7 @@ export class TableSession implements GameHost {
   private pauseBanner: HTMLDivElement | null = null;
 
   update(dt: number) {
+    this.updateKibitz(dt);
     // tavla: her oyunun sonucu (normal/mars/katmerli) ayrı ödenir
     if (this.ui && this.gameId === 'tavla') {
       const s = (this.ui as unknown as { s: { lastResult: { winner: 0 | 1; kind: 'normal' | 'mars' | 'katmerli' } | null; gameNo: number } }).s;

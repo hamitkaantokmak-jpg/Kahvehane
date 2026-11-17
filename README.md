@@ -133,3 +133,24 @@ taşa, karta ya da bota etkisi yoktur; masada oynarken de çalışır ("💦 Ça
 - Sonuç tohumdan tek seferde belirlenir (aynı tohum = aynı sonuç); TV yalnızca oynatır.
 - TV'ye gidip E → at ve miktar (5/10/20/50🪙, yalnızca nakit) seç. Kazanırsan yatırdığın × oran (aşağı yuvarlanır).
 - NPC'ler de bahis yapar (Cemal her zaman, uzun oranlı atlara). Foto finişte kaybedenler "Hileli!" diye bağırır, gerginlik artar.
+
+## Küçük kaos olayları (Aşama 5)
+Kurallar `src/chaos/eventRules.ts` (saf), kayıtlar `src/chaos/events.ts`, görsel katman `src/world/ChaosEvents.ts` ve `src/world/Cat.ts`.
+Kaos Direktörü gol, elektrik kesintisi ve kediyi gerginliğe göre kendiliğinden seçer. Masa devirme, itiraz ve kibitz bir duruma bağlıdır:
+kayıtta ağırlıkları 0'dır, yani rastgele seçilmezler ama puan ve bekleme süreleri yine kayıttan gelir.
+
+| Olay | Gerginlik aralığı | Puan | Bekleme |
+|---|---|---|---|
+| TV'de gol | 0–70 | +5 | 45 sn |
+| Elektrik kesintisi | 20–100 | +6 | 120 sn |
+| Kedi | 0–80 | +15 | 90 sn |
+| Kavga | 30–100 | +10 | 60 sn |
+| Masa devirme (tetiklenir) | — | +25 | 120 sn |
+| İtiraz (oyuncu) | — | +3…+8 (mizaca göre) | 8 sn |
+
+- **TV'de gol:** TV "GOOOL!" der, yakındakiler ayağa kalkıp bağırır; TV'ye yakın masalarda bardaklar titrer, bazıları devrilir.
+- **Elektrik kesintisi:** ~22 sn ışıklar söner, turuncu acil fener yanar, NPC'ler bağırır. Masa arayüzü etkilenmez, oyun oynanır.
+- **Kedi:** kapıdan girer, bir masaya çıkıp çayı devirir, NPC'ler kişiliklerine göre tepki verir (masadakiler kaçabilir), sonra çıkar.
+- **İtiraz (masada 🙋):** bir bota "hile" iddiası; yalnızca replik + gerginlik (gerçek hile tespiti yok). 8 sn bekleme.
+- **Masa devirme:** çok sinirli biri (Rıza Dayı) okeyi kaybedip öfkelenirse masayı devirir, taşlar havalanır; **sonuç ve puanlar geçerli kalır**.
+- **Kibitz:** oyun sırasında boştaki bir NPC arkanda durup akıl verir ("O taşı atma!"). Menü → "Masada izleyici yorumları" ile kapatılabilir.

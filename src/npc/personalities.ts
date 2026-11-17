@@ -45,6 +45,14 @@ export interface Personality {
     teaSplashed: string[];
     /** Çaylı yüzlü birini görünce */
     teaSeen: string[];
+    /** Masa başında başkasının oyununa akıl verirken */
+    kibitz: string[];
+    /** Oyuncu itiraz edince */
+    objectionReply: string[];
+    /** Elektrik kesilince */
+    powerCut: string[];
+    /** Kedi girince */
+    catReact: string[];
   };
 }
 
@@ -77,6 +85,10 @@ export const PERSONALITIES: Record<string, Personality> = {
       betRaise: ['Bu bahis az, bir çay daha koy!', 'Ustaya karşı bu kadar mı?'],
       teaSplashed: ['Oğlum benim bıyığım çay oldu!', 'Bu çayı sen içecektin, ben değil!', 'Ömrümde böyle hakaret görmedim!'],
       teaSeen: ['Hah! Yüzü demlik gibi olmuş!', 'Çayı içilir evladım, yüze sürülmez.'],
+      kibitz: ['O taşı atma evladım!', 'Bende o el olsa çoktan biterdi.', 'Okeyi sakla, sakla!'],
+      objectionReply: ['İtiraz mı? Ben 50 yıllık oyuncuyum!', 'Hile yok, maharet var!', 'Hah, kaybedince itiraz!'],
+      powerCut: ['Şükrü! Sigorta attı yine!', 'Gözlüğümü de göremiyorum şimdi!'],
+      catReact: ['Pist pist! Masadan in!', 'Bu kedi de okey mi oynayacak?'],
     },
   },
   cemal: {
@@ -107,6 +119,10 @@ export const PERSONALITIES: Record<string, Personality> = {
       betRaise: ['Az bu! İkiye katlayalım mı?', 'Reis masasında bu bahis oynanmaz, artıralım!', 'İddiasına varım, bahsi büyütelim!'],
       teaSplashed: ['Bahse girerim bu çay sıcaktı!', 'Gömleğim! İddiasına varım, ödeteceğim!'],
       teaSeen: ['Bahse girerim o leke çıkmaz!', 'Çay maskesi mi bu? Moda olmuş!'],
+      kibitz: ['Bahse girerim o taş işe yarar!', 'Ben olsam çifte giderdim.', 'Zarı sağdan at, şans getirir.'],
+      objectionReply: ['İtiraz reddedildi, iddia kazanıldı!', 'Kanıtın var mı? Yok! Hah!', 'Kaybeden itiraz eder, bilinir.'],
+      powerCut: ['Bahse girerim beş dakikaya gelir!', 'Karanlıkta da kazanırım ben!'],
+      catReact: ['Bahse girerim bu kedi çayı devirir!', 'Kedi de iddiaya mı geldi?'],
     },
   },
   nihat: {
@@ -137,6 +153,10 @@ export const PERSONALITIES: Record<string, Personality> = {
       betRaise: ['Biraz daha koyalım, heyecan olsun!', 'Pişti gibi bahis, ikiye katla!'],
       teaSplashed: ['Hahaha, çay banyosu! Teşekkürler!', 'Ay, şeker koymamışsın!'],
       teaSeen: ['Hıh hıh, yüzünde tavşan kanı var!', 'Tebrikler, çay pişti oldun!'],
+      kibitz: ['Hıh hıh, ben görmedim ama sen gördün.', 'O kart çıktı, sayıyorum ben!', 'Valeyi sakla be!'],
+      objectionReply: ['Hahaha, itirazın çok tatlı!', 'Bana mı dedin? Ben melek gibiyim!', 'Kanıt yok, iddia çok!'],
+      powerCut: ['Hah, karanlıkta kartları göremiyorum, eşitlendik!', 'Kim söndürdü?'],
+      catReact: ['Pisicik! Gel gel!', 'Kedi pişti yaptı, çayı devirdi!'],
     },
   },
   sukru: {
@@ -167,6 +187,10 @@ export const PERSONALITIES: Record<string, Personality> = {
       betRaise: ['Abi benim işim var ama olur, artıralım.', 'Bir çay daha koyalım abi.'],
       teaSplashed: ['Abi o bardak benim zimmetimde!', 'Abi çay içilir, atılmaz!', 'Bardaklar! Taze demlemiştim!'],
       teaSeen: ['Abi peçete getireyim mi?', 'Abi yüzünde çay kalmış, sil istersen.'],
+      kibitz: ['Abi o taş iyi, at gitsin.', 'Abi çayın soğuyor, hızlı oyna.'],
+      objectionReply: ['Abi ben çaycıyım, hakem değilim!', 'Abi kavga yok, çay var!', 'Tamam abi, deftere yazdım itirazı.'],
+      powerCut: ['Mum getiriyorum! Semaver de soğuyor!', 'Abiler sakin, elektrik gelir!'],
+      catReact: ['Kedi! Bardaklarım!', 'Pist! Tezgâha çıkma!'],
     },
   },
   hasan: {
@@ -197,6 +221,10 @@ export const PERSONALITIES: Record<string, Personality> = {
       betRaise: ['Artıralım mı? Ben uyurken karar verin...', 'Olur... zzz...'],
       teaSplashed: ['Ha?! Yağmur mu yağıyor?', 'Rüyamda deniz vardı... çaymış.'],
       teaSeen: ['Zzz... birinin yüzü çay olmuş... zzz', 'Ha, çay mı döküldü?'],
+      kibitz: ['Zzz... o taşı... zzz', 'Hı? Ben olsam uyurdum.'],
+      objectionReply: ['Ha? İtiraz mı? Ben uyuyordum...', 'Rüyamda hile yoktu...', 'Zzz... reddedildi... zzz'],
+      powerCut: ['Oh, karanlık. Tam uyku vakti.', 'Işıklar mı gitti? İyi, uyuyorum.'],
+      catReact: ['Kedi... bana yaslanabilir...', 'Gel pisi, beraber uyuyalım.'],
     },
   },
   ferhat: {
@@ -227,6 +255,10 @@ export const PERSONALITIES: Record<string, Personality> = {
       betRaise: ['Gol gibi bahis istiyorum, artıralım!', 'Maç heyecanı lazım, ikiye katla!'],
       teaSplashed: ['Faul! Çay faulü!', 'Formam! Şampiyonluk formam!'],
       teaSeen: ['Yüzünde çay haritası var, ofsayt!', 'Kırmızı kart kadar kızarmış yüzün!'],
+      kibitz: ['Ofsayt! O taşı atma!', 'Kontra atak lazım, sağdan çek!', 'Hakem olsam o hamleyi iptal ederdim.'],
+      objectionReply: ['VAR\'a gidelim, itiraz reddedildi!', 'Hakem benim, oyun devam!', 'İtiraz kırmızı kart sebebi!'],
+      powerCut: ['Maç yarıda kaldı! Jeneratör yok mu?!', 'Skor neydi, skor?!'],
+      catReact: ['Sahaya kedi girdi, maç durdu!', 'Kedi taraftar, çok yaşa!'],
     },
   },
   kemal: {
@@ -257,6 +289,10 @@ export const PERSONALITIES: Record<string, Personality> = {
       betRaise: ['Bütçe uygun, bahsi artırabiliriz.', 'Resmi teklifim: ikiye katlayalım.'],
       teaSplashed: ['Muhtara çay atılmaz! Tutanak!', 'Resmi kıyafetim lekelendi!'],
       teaSeen: ['Bu yüz resmi kayıtlara geçti.', 'Islak imza mı attın evlat?'],
+      kibitz: ['Muhtar olarak tavsiyem: o taşı tut.', 'Resmi görüşüm: çifte git.', 'Kayıtlara göre o kart oynandı.'],
+      objectionReply: ['İtirazınız dilekçeyle alınır.', 'Komisyon itirazınızı reddetti.', 'Tutanakta öyle bir şey yok evlat.'],
+      powerCut: ['Belediyeyi arayacağım, elektrik gelsin!', 'Mahalle karanlıkta kaldı, tutanak!'],
+      catReact: ['Sokak hayvanları muhtarlığın emanetidir!', 'Kediye mama getirin, resmi talimat!'],
     },
   },
 };

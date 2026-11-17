@@ -113,7 +113,7 @@ describe('Kişilik verisi', () => {
   it('her NPC için yeni replik kategorileri dolu ve ilişkiler geçerli kimliklere işaret ediyor', () => {
     const ids = Object.keys(PERSONALITIES);
     for (const p of Object.values(PERSONALITIES)) {
-      for (const k of ['brawlJoin', 'brawlBreakUp', 'calmDown', 'brawlFlee', 'debtTease', 'betRaise', 'teaSplashed', 'teaSeen'] as const) {
+      for (const k of ['brawlJoin', 'brawlBreakUp', 'calmDown', 'brawlFlee', 'debtTease', 'betRaise', 'teaSplashed', 'teaSeen', 'kibitz', 'objectionReply', 'powerCut', 'catReact'] as const) {
         expect(p.lines[k].length, `${p.id}.${k}`).toBeGreaterThanOrEqual(2);
         expect(new Set(p.lines[k]).size).toBe(p.lines[k].length);
       }

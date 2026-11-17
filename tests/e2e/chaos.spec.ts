@@ -6,7 +6,7 @@ const g = (page: any, body: string) => page.evaluate(new Function(`const g = win
 test('Kaos: Rıza Dayı ilk şaplakta kavga başlatır, oyuncuya karşılık verir, Şükrü yatıştırır; çubuk yükselip düşer', async ({ page }) => {
   test.setTimeout(180_000);
   const errs = trackErrors(page);
-  await boot(page, 'gspeed=2');
+  await boot(page, 'gspeed=4');
   await g(page, `
     const n = g.npcs.find((x) => x.id === 'riza');
     if (n.c.seated) n.leaveSeat();

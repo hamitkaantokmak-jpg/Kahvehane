@@ -68,6 +68,22 @@ export class Kahvehane {
   private steam: THREE.Mesh[] = [];
   private time = 0;
   lights: THREE.Light[] = [];
+  private bulbMats: THREE.MeshBasicMaterial[] = [];
+  private baseIntensity = new Map<THREE.Light, number>();
+  /** Elektrik kesintisinde yanan turuncu acil durum feneri */
+  readonly emergency = new THREE.PointLight(0xff8a3d, 0, 9, 1.5);
+  powerFactor = 1;
+
+  /** Elektrik: 1 = normal, 0.15 = kesinti (loş). Acil fener ters orantılı yanar. */
+  setPower(f: number) {
+    this.powerFactor = f;
+    if (!this.baseIntensity.size) for (const l of this.lights) this.baseIntensity.set(l, l.intensity);
+    for (const l of this.lights) l.intensity = (this.baseIntensity.get(l) ?? 1) * (l instanceof THREE.HemisphereLight ? Math.max(0.25, f) : f);
+    for (const m of this.bulbMats) m.color.setRGB(f, f * 0.95, f * 0.7);
+    this.emergency.intensity = (1 - f) * 7;
+    // kesinti yokken fener sahneden çıkar (gölgelendirici maliyeti olmasın)
+    this.emergency.visible = f < 0.999;
+  }
   readonly W = 18;
   readonly D = 14;
   readonly H = 3.6;
@@ -634,6 +650,9 @@ export class Kahvehane {
     sun.shadow.normalBias = 0.02;
     this.group.add(sun, sun.target);
     this.lights.push(hemi, sun);
+    this.emergency.position.set(-7.6, 2.4, -2.6);
+    this.emergency.visible = false;
+    this.group.add(this.emergency);
     // sarkıt lambalar (emissive ampul + birkaç noktasal ışık)
     const lampPos: [number, number][] = [[-3.6, -3.0], [0.5, -2.6], [4.6, -3.0], [-1.6, 1.6], [2.4, 1.6], [-5.6, 1.4], [6.2, 1.2]];
     lampPos.forEach(([x, z], i) => {
@@ -644,7 +663,9 @@ export class Kahvehane {
       (shade.material as THREE.Material).side = THREE.DoubleSide;
       shade.position.set(x, this.H - 1.15, z);
       this.group.add(shade);
-      const bulb = new THREE.Mesh(sharedGeo('bulb', () => new THREE.SphereGeometry(0.08, 10, 8)), new THREE.MeshBasicMaterial({ color: 0xfff3b0 }));
+      const bulbMat = new THREE.MeshBasicMaterial({ color: 0xfff3b0 });
+      this.bulbMats.push(bulbMat);
+      const bulb = new THREE.Mesh(sharedGeo('bulb', () => new THREE.SphereGeometry(0.08, 10, 8)), bulbMat);
       bulb.position.set(x, this.H - 1.25, z);
       this.group.add(bulb);
       if (i < 4) {
