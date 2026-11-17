@@ -18,11 +18,12 @@ Mobil: sol yarı sanal joystick (uzağa çekince koşar), sağ yarı kamera, ✋
 ## Mimari
 | Klasör | Görev |
 |---|---|
+| `src/chaos` | **Saf mantık:** Kaos Direktörü (gerginlik, olay seçimi, kayıt defteri), zincirleme kavga modeli |
 | `src/games/common` | RNG, taş seti, per doğrulama, el çözümleyici (grafikten bağımsız) |
 | `src/games/okey`, `okey101`, `tavla`, `pisti` | Her oyunun kural motoru + ayrı bot modülü |
 | `src/world` | Kahvehane sahnesi, materyaller, prosedürel dokular, çarpışma + A* yol bulma |
 | `src/characters` | Modüler karakter tanımı (gelecekteki karakter oluşturucu için), model, prosedürel animatör |
-| `src/npc` | Kişilikler/replikler, davranış sistemi |
+| `src/npc` | Kişilikler/replikler (dost/rakip ilişkileri), davranış sistemi, kavga davranış katmanı (`BrawlController`) |
 | `src/interactions` | Istaka şaplağı, emote'lar, laf atma, çay ısmarlama |
 | `src/tables` | Masa oturumu: oyun seçimi, botların masaya yerleşmesi, 3D masa geri bildirimi |
 | `src/ui` | HUD, konuşma balonları, oyun arayüzleri (DOM) |
@@ -64,3 +65,22 @@ Normal 1, mars 2, katmerli mars 3 (seçenek). Katlama küpü yok. Maç 1/3/5 pua
 4'er dağıtım. Aynı değer ya da vale yığını alır; tek kartı aynı değerle almak pişti 10, vale ile vale 20.
 As 1, Vale 1, ♣2 = 2, ♦10 = 3, en çok kart +3 (eşitlikte yok). Son kalan kartlar son alana. 4 kişide karşılıklı takım.
 Hedef 51/101/151; hedefe ulaşılan elin sonunda yüksek olan kazanır (eşitse devam).
+
+## Kaos sistemi (Aşama 1)
+Saf mantık (`src/chaos/`) three.js ve DOM kullanmaz; rastgelelik `rng.ts` ile, zaman `dt` ile dışarıdan verilir; durum JSON'a çevrilebilir.
+
+- **Gerginlik (0-100):** olaylar puan ekler (`TENSION_POINTS`: şaplak +8, kavga başlangıcı +10, kavga vuruşu +2, masa devirme +25,
+  kedi +15, bardak kırılması +3, yatıştırma −30) ve saniyede 0.6 düşer. Seviyeler: Sakin < 25 ≤ Hareketli < 50 ≤ Gergin < 75 ≤ Patlamak üzere.
+- **Kaos Direktörü:** ~20 sn'de bir, gerginlikle artan olasılıkla, kayıt defterinden (`events.ts`) bir olay seçer:
+  gerginlik aralığına uyan, bekleme süresi dolmuş, bir önceki olaydan farklı olaylar arasında ağırlıklı seçim.
+  Yeni olay = `DEFAULT_EVENTS`'e bir satır + oyun katmanında bir işleyici. Bu aşamada yalnızca **kavga** işleyicisi var
+  (TV'de gol, elektrik kesintisi, kedi kayıtlı ama işleyicisi Aşama 5'te).
+- **Zincirleme kavga:** ıstaka yiyen NPC'nin öfkesi `0.35 + temper×0.3` artar; 0.6'yı geçince oyuncuyla kavga başlar
+  (Rıza Dayı ilk şaplakta, sakin karakterler ikincide). Yakındakiler kavga başına bir kez değerlendirilir:
+  dost → yardıma gelir, rakip → karşı tarafa geçer, tarafsız → ayırmaya çalışır ya da kaçar
+  (olasılık = ilişki × öfke × mesafe). En fazla 5 savaşan; kavga en geç 18 sn'de, yorulunca ya da yatıştırılınca biter.
+- **Şükrü:** gerginlik 28'i geçince ya da kavga 4 sn'yi aşınca tepsiyle gelir, "Beyler, sakin olun!" der, gerginliği 30 düşürür.
+- **Masadaki oyun:** kavgaya karışan masa botu masadan kalkar; **oyun duraklar** (bot sırası bekler, ekranda "⏸ Oyun bekliyor"),
+  bot masasına dönünce kaldığı yerden devam eder. İnsan oyuncu kendi hamlesini yapabilir.
+- **HUD:** ekranın üstünde "Gerginlik" çubuğu (renk/seviye), tavana yaklaşınca uyarı yazısı.
+- **Ayar:** Menü → Kaos yoğunluğu: Sakin (puan ×0.6, olay sıklığı ×0.5) / Normal / Tam kaos (×1.6 / ×2).

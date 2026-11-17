@@ -56,6 +56,8 @@ export class Okey101UI implements GameUI {
   // ------------------------------------------------------------ botlar
   private pump() {
     if (!this.alive || this.s.phase === 'ended' || this.host.isHuman(this.s.current)) return;
+    // masadan kalkan (kavgadaki) oyuncu varsa bot sırası bekler
+    if (this.host.paused) { clearTimeout(this.botTimer); this.botTimer = later(() => this.pump(), 600); return; }
     const p = this.s.current;
     if (this.botBusy) return;
     if (Math.random() < 0.3) this.host.react(p, 'think');

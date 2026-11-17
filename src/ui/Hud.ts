@@ -12,6 +12,12 @@ export class Hud {
   private mobileBtns: HTMLDivElement;
   private help: HTMLDivElement;
   private toastTimer = 0;
+  private tensionFill!: HTMLDivElement;
+  private tensionLevel!: HTMLElement;
+  private tensionEl!: HTMLDivElement;
+  private warnEl!: HTMLDivElement;
+  private warnTimer = 0;
+  private lastTension = -1;
   onEmote: (id: EmoteId) => void = () => {};
   onSettings: (s: Settings) => void = () => {};
   onResume: () => void = () => {};
@@ -23,6 +29,11 @@ export class Hud {
     parent.appendChild(this.root);
     this.root.innerHTML = `
       <div class="title-badge">☕ KAHVEHANE</div>
+      <div class="tension" id="tension" title="Kahvehane Gerginliği">
+        <div class="tension-label">Gerginlik: <b id="tensionLevel">Sakin</b></div>
+        <div class="tension-track"><div class="tension-fill" id="tensionFill"></div></div>
+      </div>
+      <div class="warn" id="warn"></div>
       <div class="help" id="help">
         <b>WASD</b> yürü · <b>Shift</b> koş · <b>Fare</b> kamera (tıkla/sürükle) · <b>E</b> etkileşim / otur<br/>
         <b>F</b> ıstakayla şaplak · <b>Q</b> hareketler · <b>1-7</b> hızlı hareket · <b>T</b> çay iste · <b>Esc</b> menü
@@ -45,6 +56,10 @@ export class Hud {
     this.pauseEl = this.root.querySelector('#pause')!;
     this.mobileBtns = this.root.querySelector('#mobileBtns')!;
     this.help = this.root.querySelector('#help')!;
+    this.tensionFill = this.root.querySelector('#tensionFill')!;
+    this.tensionLevel = this.root.querySelector('#tensionLevel')!;
+    this.tensionEl = this.root.querySelector('#tension')!;
+    this.warnEl = this.root.querySelector('#warn')!;
     this.root.querySelector('.help-close')!.addEventListener('click', () => (this.help.style.display = 'none'));
     if (input.isTouch) { this.help.innerHTML = 'Sol: hareket (uzağa çek = koş) · Sağ: kamera · ✋ etkileşim · 🏏 ıstaka · 😀 hareketler <span class="help-close">✕</span>'; this.help.querySelector('.help-close')!.addEventListener('click', () => (this.help.style.display = 'none')); }
     this.mobileBtns.style.display = input.isTouch ? 'flex' : 'none';
@@ -65,6 +80,26 @@ export class Hud {
 
   setVisible(v: boolean) {
     this.root.classList.toggle('hidden-explore', !v);
+  }
+
+  /** Gerginlik çubuğu (0-100). Renk ve seviye yazısı değişir. */
+  setTension(t: number, level: 'calm' | 'lively' | 'tense' | 'explosive') {
+    const r = Math.round(t);
+    if (r === this.lastTension) return;
+    this.lastTension = r;
+    this.tensionFill.style.width = `${r}%`;
+    this.tensionEl.dataset.level = level;
+    this.tensionLevel.textContent = { calm: 'Sakin', lively: 'Hareketli', tense: 'Gergin', explosive: 'Patlamak üzere' }[level];
+  }
+
+  /** Kısa, yanıp sönen uyarı yazısı */
+  flashWarning(msg: string, seconds = 3) {
+    this.warnEl.textContent = msg;
+    this.warnEl.classList.remove('show');
+    void this.warnEl.offsetWidth;
+    this.warnEl.classList.add('show');
+    clearTimeout(this.warnTimer);
+    this.warnTimer = window.setTimeout(() => this.warnEl.classList.remove('show'), seconds * 1000);
   }
 
   setPrompt(text: string | null) {
@@ -101,6 +136,12 @@ export class Hud {
             <option value="low" ${s.quality === 'low' ? 'selected' : ''}>Düşük (mobil)</option>
             <option value="medium" ${s.quality === 'medium' ? 'selected' : ''}>Orta</option>
             <option value="high" ${s.quality === 'high' ? 'selected' : ''}>Yüksek</option>
+          </select></label>
+        <label>Kaos yoğunluğu
+          <select data-k="chaosIntensity">
+            <option value="calm" ${s.chaosIntensity === 'calm' ? 'selected' : ''}>Sakin</option>
+            <option value="normal" ${s.chaosIntensity === 'normal' ? 'selected' : ''}>Normal</option>
+            <option value="chaos" ${s.chaosIntensity === 'chaos' ? 'selected' : ''}>Tam kaos</option>
           </select></label>
         <label>Fare hassasiyeti <input type="range" min="0.3" max="2.5" step="0.1" data-k="sensitivity" value="${s.sensitivity}"></label>
         <label class="row"><input type="checkbox" data-k="invertY" ${s.invertY ? 'checked' : ''}> Kamerayı ters çevir (Y)</label>

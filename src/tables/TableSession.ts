@@ -21,6 +21,8 @@ export interface GameHost {
   readonly names: string[];
   readonly gameId: GameId;
   readonly difficulty: Difficulty;
+  /** Bir katılımcı (ör. kavgaya karıştığı için) masada değilse bot sırası bekler */
+  readonly paused: boolean;
   isHuman(i: number): boolean;
   react(i: number, kind: ReactKind, line?: string): void;
   sfx(name: SfxName): void;
@@ -51,7 +53,7 @@ export class TableSession implements GameHost {
   names: string[] = [];
   gameId: GameId = 'okey';
   get difficulty() { return this.options.difficulty; }
-  private participants: (NPC | 'player')[] = [];
+  participants: (NPC | 'player')[] = [];
   ui: GameUI | null = null;
   private exitConfirm: HTMLDivElement | null = null;
   readonly table3d: TableView3D;
@@ -192,6 +194,13 @@ export class TableSession implements GameHost {
     }
   }
 
+  /** Kavga vb. nedeniyle masadan kalkmış katılımcılar */
+  awayNames(): string[] {
+    return this.participants.filter((p): p is NPC => p !== 'player' && (p.awayFromGame || p.inBrawl || p.mode === 'returning')).map((p) => p.c.name);
+  }
+
+  get paused(): boolean { return this.awayNames().length > 0; }
+
   isHuman(i: number) {
     return this.participants[i] === 'player';
   }
@@ -308,7 +317,15 @@ export class TableSession implements GameHost {
     this.game.standUp();
   }
 
+  private pauseBanner: HTMLDivElement | null = null;
+
   update(dt: number) {
+    if (this.ui) {
+      if (!this.pauseBanner) { this.pauseBanner = h('div', 'pause-banner'); this.root.appendChild(this.pauseBanner); }
+      const away = this.awayNames();
+      this.pauseBanner.classList.toggle('show', away.length > 0);
+      if (away.length) this.pauseBanner.textContent = `⏸ Oyun bekliyor: ${away.join(', ')} kavgada!`;
+    }
     this.ui?.update?.(dt);
     this.table3d.update(dt);
   }

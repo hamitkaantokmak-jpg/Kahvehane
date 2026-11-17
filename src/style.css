@@ -37,8 +37,8 @@ html, body { margin: 0; height: 100%; overflow: hidden; background: #2a1a10; fon
 .help-close { position: absolute; right: 8px; top: 4px; cursor: pointer; font-weight: bold; }
 .prompt { display: none; position: absolute; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--paper); border: 3px solid var(--ink); border-radius: 14px; padding: 8px 16px; font-size: 17px; font-weight: 700; box-shadow: var(--shadow); white-space: nowrap; pointer-events: none !important; }
 kbd { display: inline-block; background: var(--ink); color: var(--paper); border-radius: 6px; padding: 0 7px; margin-right: 6px; font-family: inherit; font-weight: 800; }
-.toast { position: absolute; top: 14px; left: 50%; transform: translate(-50%, -80px); background: var(--ink); color: var(--paper); padding: 8px 18px; border-radius: 12px; font-weight: 600; transition: transform .25s; max-width: 90vw; text-align: center; pointer-events: none !important; z-index: 50; }
-.toast.show { transform: translate(-50%, 0); }
+.toast { position: absolute; top: 72px; left: 50%; transform: translate(-50%, -150px); opacity: 0; background: var(--ink); color: var(--paper); padding: 8px 18px; border-radius: 12px; font-weight: 600; transition: transform .25s, opacity .25s; max-width: 90vw; text-align: center; pointer-events: none !important; z-index: 50; }
+.toast.show { transform: translate(-50%, 0); opacity: 1; }
 .menu-btn { position: absolute; top: 10px; right: 12px; width: 44px; height: 44px; border-radius: 12px; border: 3px solid var(--ink); background: var(--paper); font-size: 22px; box-shadow: var(--shadow); cursor: pointer; }
 .emote-menu { position: absolute; bottom: 140px; left: 50%; transform: translateX(-50%) scale(.8); display: none; grid-template-columns: repeat(4, auto); gap: 8px; background: rgba(255, 243, 214, .96); border: 3px solid var(--ink); border-radius: 16px; padding: 10px; }
 .emote-menu.show { display: grid; animation: pop .2s; transform: translateX(-50%); }
@@ -275,3 +275,20 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
   .bubble { font-size: 12px; max-width: 160px; }
 }
 .diff-row { display: flex; gap: 8px; justify-content: center; align-items: center; font-weight: 700; margin: 6px 0; }
+
+/* ------------------------------------------------ kaos: gerginlik çubuğu */
+.tension { position: absolute; top: 12px; left: 50%; transform: translateX(-50%); width: min(300px, 46vw); background: rgba(255, 243, 214, .92); border: 3px solid var(--ink); border-radius: 12px; padding: 3px 8px 6px; pointer-events: none !important; box-shadow: var(--shadow); }
+.tension-label { font-size: 12px; font-weight: 700; text-align: center; }
+.tension-track { height: 10px; border-radius: 6px; background: rgba(42,26,16,.15); overflow: hidden; border: 2px solid var(--ink); }
+.tension-fill { height: 100%; width: 0; background: #5ad17a; transition: width .4s, background .4s; }
+.tension[data-level="lively"] .tension-fill { background: #f2b134; }
+.tension[data-level="tense"] .tension-fill { background: #f07c2a; }
+.tension[data-level="explosive"] .tension-fill { background: #d9412b; }
+.tension[data-level="explosive"] { animation: shake .35s infinite; }
+@keyframes shake { 25% { transform: translateX(calc(-50% - 2px)) rotate(-1deg); } 75% { transform: translateX(calc(-50% + 2px)) rotate(1deg); } }
+.warn { position: absolute; top: 112px; left: 50%; transform: translateX(-50%) scale(.6); opacity: 0; color: #fff; background: var(--red); border: 3px solid var(--ink); border-radius: 12px; padding: 6px 16px; font-weight: 900; font-size: 18px; pointer-events: none !important; white-space: nowrap; z-index: 45; }
+.warn.show { animation: warnPop 3s forwards; }
+@keyframes warnPop { 0% { opacity: 0; transform: translateX(-50%) scale(.4) rotate(-4deg); } 10% { opacity: 1; transform: translateX(-50%) scale(1.15) rotate(2deg); } 20%, 85% { opacity: 1; transform: translateX(-50%) scale(1) rotate(0); } 100% { opacity: 0; } }
+.pause-banner { position: absolute; top: 74px; left: 50%; transform: translateX(-50%); background: var(--gold); border: 3px solid var(--ink); border-radius: 12px; padding: 4px 14px; font-weight: 800; z-index: 25; display: none; }
+.pause-banner.show { display: block; }
+@media (max-width: 760px) { .tension { top: 56px; width: 60vw; } .warn { top: 110px; font-size: 14px; } }

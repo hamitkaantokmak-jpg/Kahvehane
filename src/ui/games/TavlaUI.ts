@@ -61,6 +61,7 @@ export class TavlaUI implements GameUI {
     if (!this.alive) return;
     const s = this.s;
     if (s.phase === 'gameOver' || s.phase === 'matchOver') { this.onGameEnd(); return; }
+    if (s.phase === 'roll' && s.current === 1 && this.host.paused) { this.timer = later(() => this.next(), 600); this.render(); return; }
     if (s.phase === 'roll' && s.current === 1 && !this.botBusy) { this.botBusy = true; this.botTurn().finally(() => { this.botBusy = false; }); }
     this.render();
   }

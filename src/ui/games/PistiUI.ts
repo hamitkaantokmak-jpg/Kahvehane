@@ -65,6 +65,8 @@ export class PistiUI implements GameUI {
 
   private pump() {
     if (!this.alive || this.s.phase !== 'play' || this.host.isHuman(this.s.current)) return;
+    // masadan kalkan (kavgadaki) oyuncu varsa bot sırası bekler
+    if (this.host.paused) { clearTimeout(this.timer); this.timer = later(() => this.pump(), 600); return; }
     const p = this.s.current;
     clearTimeout(this.timer);
     this.timer = later(() => this.play(p, choosePistiCard(P.viewPisti(this.s, p), this.rng, this.host.difficulty)), 750 + Math.random() * 500);

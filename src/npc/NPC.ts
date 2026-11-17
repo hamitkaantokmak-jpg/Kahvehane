@@ -11,6 +11,7 @@ import type { Kahvehane, Seat } from '../world/Kahvehane';
 import type { NavGrid } from '../world/Collision';
 import type { Effects } from '../fx/Effects';
 import { sfx } from '../audio/Sfx';
+import type { TensionSource } from '../chaos/events';
 
 export interface NpcWorld {
   kahve: Kahvehane;
@@ -24,7 +25,7 @@ export interface NpcWorld {
   reservedTable: string | null;
 }
 
-type Mode = 'idle' | 'walking' | 'seated' | 'tv' | 'chat' | 'sleep' | 'bench' | 'react' | 'retaliate' | 'inGame' | 'serve' | 'wander';
+type Mode = 'idle' | 'walking' | 'seated' | 'tv' | 'chat' | 'sleep' | 'bench' | 'react' | 'retaliate' | 'inGame' | 'serve' | 'wander' | 'brawl' | 'returning';
 
 export class NPC {
   readonly c: Character;
@@ -45,6 +46,13 @@ export class NPC {
   private teaObj: THREE.Object3D | null = null;
   private greeted = false;
   private zzzT = 0;
+  /** 0..1 öfke: ıstaka yedikçe artar, zamanla söner. Eşiği aşınca kavga başlatır. */
+  anger = 0;
+  /** Kavgada mı (BrawlController yönetir) */
+  inBrawl = false;
+  brawlRole: 'fighter' | 'helper' | 'separator' | 'fleer' | null = null;
+  /** Oyun masasından kavga yüzünden kalktı mı (oyun duraklatma için) */
+  awayFromGame = false;
 
   constructor(c: Character, p: Personality, private w: NpcWorld) {
     this.c = c;
@@ -258,6 +266,17 @@ export class NPC {
   // ------------------------------------------------------------ tepkiler
   /** Istakayla vurulduğunda */
   onBonked(from: Character) {
+    this.anger = Math.min(1, this.anger + 0.35 + this.p.temper * 0.3);
+    this.w.onTension?.('bonk');
+    if (this.inBrawl) {
+      // kavgadayken: yalnızca görsel tepki, kavga sürer
+      this.bonkCount++;
+      this.c.anim.play('stagger');
+      this.c.anim.hitImpulse(1.5);
+      this.w.effects.stars(this.c.model.head, 2);
+      this.c.say(pickLine(this.p.lines.bonkedAgain), 2.2);
+      return;
+    }
     if (this.mode === 'inGame') {
       // oyundayken: oturduğu yerden tepki
       this.c.anim.play('stagger');
@@ -294,6 +313,38 @@ export class NPC {
     // sinirli karakterler karşılık verir
     const retaliate = this.p.temper >= 0.6 && this.bonkCount >= 2 && (this.p.temper >= 0.85 || Math.random() < 0.75);
     this.retaliatePending = retaliate;
+    // öfke eşiği aşıldıysa oyuncuyla kavga başlar; yandakiler taraf tutar
+    if (this.anger >= ANGER_BRAWL && this.w.requestBrawl?.(this.id, 'player')) this.retaliatePending = false;
+  }
+
+  enterBrawl(role: 'fighter' | 'helper' | 'separator' | 'fleer') {
+    if (this.mode === 'inGame') this.awayFromGame = true;
+    this.inBrawl = true;
+    this.brawlRole = role;
+    this.mode = 'brawl';
+    this.retaliatePending = false;
+  }
+
+  exitBrawl() {
+    this.inBrawl = false;
+    this.brawlRole = null;
+    this.awayFromGame = false;
+    this.anger *= 0.3;
+    if (this.mode === 'brawl' || this.mode === 'returning') { this.mode = 'idle'; this.timer = 2 + Math.random() * 2; }
+  }
+
+  /** Kavgadan masaya geri dönüş yolunda */
+  returnToGame() {
+    this.inBrawl = false;
+    this.brawlRole = null;
+    this.anger *= 0.3;
+    this.mode = 'returning';
+  }
+
+  backInGame() {
+    this.awayFromGame = false;
+    this.mode = 'inGame';
+    this.c.anim.posture = 'sit';
   }
   private retaliatePending = false;
 
@@ -324,6 +375,7 @@ export class NPC {
   // ------------------------------------------------------------ güncelleme
   update(dt: number) {
     const c = this.c;
+    this.anger = Math.max(0, this.anger - dt * 0.03);
     if (this.bonkDecay > 0) { this.bonkDecay -= dt; if (this.bonkDecay <= 0) this.bonkCount = 0; }
     // oyuncuya bakma ve selamlama
     const pd = c.pos.distanceTo(this.w.player.pos);
@@ -425,6 +477,9 @@ export class NPC {
         break;
       case 'retaliate':
         break;
+      case 'brawl':
+      case 'returning':
+        break;
       case 'inGame':
         break;
     }
@@ -507,7 +562,14 @@ export class NPC {
 export interface NpcWorldHooks {
   onPlayerTea?: () => void;
   onPlayerBonked?: (by: Character) => void;
+  /** Gerginlik kaynağı bildir (Kaos Direktörü) */
+  onTension?: (source: TensionSource) => void;
+  /** Kavga başlatma isteği; başladıysa true */
+  requestBrawl?: (a: string, b: string) => boolean;
 }
+
+/** Bu öfkenin üstünde ıstaka yiyen NPC kavga başlatır (Rıza ilk şaplakta, sakinler 2-3. şaplakta) */
+export const ANGER_BRAWL = 0.6;
 // eslint-disable-next-line @typescript-eslint/no-empty-interface
 export interface NpcWorld extends NpcWorldHooks {}
 
