@@ -57,12 +57,22 @@ export class Okey101UI implements GameUI {
   private pump() {
     if (!this.alive || this.s.phase === 'ended' || this.host.isHuman(this.s.current)) return;
     const p = this.s.current;
+    if (this.botBusy) return;
     if (Math.random() < 0.3) this.host.react(p, 'think');
+    clearTimeout(this.botTimer);
     this.botTimer = later(() => this.botTurn(p), 800 + Math.random() * 600);
   }
 
+  private botBusy = false;
+
   private async botTurn(p: number) {
-    if (!this.alive || this.s.current !== p) return;
+    if (!this.alive || this.s.current !== p || this.botBusy) return;
+    this.botBusy = true;
+    try { await this.botTurnInner(p); } finally { this.botBusy = false; }
+    if (this.alive && this.s.phase !== 'ended') this.pump();
+  }
+
+  private async botTurnInner(p: number) {
     const s = this.s;
     try {
       if (s.phase === 'draw') {

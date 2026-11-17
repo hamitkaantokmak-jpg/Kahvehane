@@ -20,6 +20,7 @@ export class TavlaUI implements GameUI {
   private status!: HTMLDivElement;
   private btns!: HTMLDivElement;
   private rolling = false;
+  private botBusy = false;
   /** Test kancası: sonraki zarı sabitle */
   forceDice: [number, number] | null = null;
 
@@ -60,7 +61,7 @@ export class TavlaUI implements GameUI {
     if (!this.alive) return;
     const s = this.s;
     if (s.phase === 'gameOver' || s.phase === 'matchOver') { this.onGameEnd(); return; }
-    if (s.phase === 'roll' && s.current === 1) this.botTurn();
+    if (s.phase === 'roll' && s.current === 1 && !this.botBusy) { this.botBusy = true; this.botTurn().finally(() => { this.botBusy = false; }); }
     this.render();
   }
 

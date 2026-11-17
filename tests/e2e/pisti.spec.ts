@@ -2,7 +2,8 @@ import { test, expect, Page } from '@playwright/test';
 import { boot, openGame, trackErrors, withUI } from './helpers';
 
 async function playUntilHandEnd(page: Page) {
-  for (let guard = 0; guard < 80; guard++) {
+  const until = Date.now() + 120_000;
+  while (Date.now() < until) {
     if (await page.locator('.modal').count()) return;
     const c = page.locator('.phand .card.playable');
     if (await c.count()) await c.first().click();
@@ -15,9 +16,21 @@ for (const players of [2, 4] as const) {
     const errs = trackErrors(page);
     await boot(page, 'speed=20');
     await openGame(page, `pisti${players}`);
-    // kurgu: yerde tek 5, elimde 5 → PİŞTİ
-    await withUI(page, `s.current = 0; s.pile = [{ id: 700, suit: 0, rank: 5 }]; s.hiddenCount = 0; s.hands[0][0] = { id: 701, suit: 1, rank: 5 }; ui.refresh();`);
-    await page.locator('.phand .card[data-id="701"]').click();
+    // kurgu (kart sayısını koruyarak): yerdeki 4 kart rakip tarafa geçer, yere elimdeki bir kartla aynı değerde tek kart konur
+    await page.waitForFunction(() => document.querySelectorAll('.phand .card.playable').length > 0);
+    // kurgu (kart sayılarını koruyarak): yerde yalnızca üst kart kalır (diğerleri rakip tarafa),
+    // destedeki aynı değerli bir kart elimdeki ilk kartla yer değiştirir → PİŞTİ
+    const mine = await withUI<number>(page, `
+      // destede aynı değerde iki kart bul (13 değer, 40+ kart → her zaman var)
+      let a = -1, b = -1;
+      for (let x = 0; x < s.deck.length && b < 0; x++) for (let y = x + 1; y < s.deck.length; y++) if (s.deck[x].rank === s.deck[y].rank && s.deck[x].rank !== 11) { a = x; b = y; break; }
+      const d1 = s.deck[a], d2 = s.deck[b];
+      const old = s.pile;
+      s.deck[a] = old.length ? old.pop() : (s.captured[0].pop() || s.captured[1].pop()); s.captured[1].push(...old);   // yerdeki kartlar: biri desteye, gerisi rakibe
+      s.deck[b] = s.hands[0][0]; s.hands[0][0] = d2;       // elime aynı değerli kart
+      s.pile = [d1]; s.hiddenCount = 0;
+      ui.refresh(); return d2.id;`);
+    await page.locator(`.phand .card[data-id="${mine}"]`).click();
     await expect(page.locator('.splash')).toContainText('PİŞTİ');
     expect(await withUI(page, 'return s.pistis[0]')).toBe(10);
     await playUntilHandEnd(page);
@@ -25,7 +38,7 @@ for (const players of [2, 4] as const) {
     await expect(modal).toContainText('El 1 bitti');
     await expect(modal.locator('table.score tr')).toHaveCount(3);
     // kart korunumu
-    expect(await withUI(page, 'return s.captured.flat().length')).toBe(52 + 1); // +1: kurgudaki fazladan kart
+    expect(await withUI(page, 'return s.captured.flat().length')).toBe(52);
     // maç sonu: hedefi düşür, bir el daha oyna
     await withUI(page, 's.options.target = 1;');
     await modal.locator('button:has-text("Sonraki el")').click();
