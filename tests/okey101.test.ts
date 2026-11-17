@@ -177,6 +177,7 @@ describe('101 Okey', () => {
           if (a.type === 'open') K.open101(s, p, a.mode, a.groups);
           else if (a.type === 'lay') K.layMeld101(s, p, a.ids);
           else if (a.type === 'add') K.addToMeld101(s, p, a.tileId, a.meldId);
+          else if (a.type === 'swap') { K.swapJoker101(s, p, a.tileId, a.meldId); break; }
           else K.discard101(s, p, a.tileId);
         }
         const total = s.hands.flat().length + s.deck.length + s.discards.flat().length + s.table.flatMap((m) => m.tiles).length + 1;
@@ -188,4 +189,58 @@ describe('101 Okey', () => {
     }
     expect(finished).toBeGreaterThan(3); // botlar el açabiliyor
   }, 120000);
+
+  it('okeyi masadaki seriden gerçek taşla değiştirip alma', () => {
+    const okey = T(3, 7);
+    const run = [T(0, 4), okey, T(0, 6)]; // okey = kırmızı 5
+    const s = setup([T(0, 5), T(1, 1), T(2, 2)]);
+    s.table = [{ id: 50, owner: 1, kind: 'run', tiles: run, slots: K.checkMeld(run, s.ctx)!.slots }];
+    // açmadan alınamaz
+    expect(() => K.swapJoker101(s, 0, s.hands[0][0].id, 50)).toThrow(/açmalısın/);
+    s.opened[0] = 'melds';
+    // yanlış taş
+    expect(K.jokerSwapSlot(s.table[0], s.hands[0][1], s.ctx)).toBe(-1);
+    const red5 = s.hands[0][0];
+    const got = K.swapJoker101(s, 0, red5.id, 50);
+    expect(got.id).toBe(okey.id);
+    expect(s.hands[0].some((t) => t.id === okey.id)).toBe(true);
+    expect(s.hands[0].some((t) => t.id === red5.id)).toBe(false);
+    expect(s.table[0].tiles.map((t) => t.num)).toEqual([4, 5, 6]);
+    expect(K.checkMeld(s.table[0].tiles, s.ctx)).not.toBeNull();
+  });
+
+  it('okeyi gruptan alma: eksik renkteki aynı sayı yeter', () => {
+    const okey = T(3, 7);
+    const grp = [T(0, 9), T(1, 9), okey];
+    const s = setup([T(2, 9), T(0, 9), T(1, 1)]);
+    s.opened[0] = 'melds';
+    s.table = [{ id: 60, owner: 2, kind: 'group', tiles: grp, slots: K.checkMeld(grp, s.ctx)!.slots }];
+    expect(K.jokerSwapSlot(s.table[0], s.hands[0][1], s.ctx)).toBe(-1); // kırmızı 9 grupta zaten var
+    K.swapJoker101(s, 0, s.hands[0][0].id, 60);
+    expect(s.hands[0].some((t) => t.id === okey.id)).toBe(true);
+  });
+
+  it('katlamalı 101: sonraki açışlar öncekinden yüksek olmalı', () => {
+    const s = K.newMatch101(createRng(5), { hands: 1, doubling: true }, 0);
+    s.ctx = { okeyColor: 3, okeyNum: 7 };
+    expect(K.openMin(s)).toBe(101);
+    const A = [T(0, 11), T(0, 12), T(0, 13)], B = [T(1, 10), T(2, 10), T(3, 10)], C = [T(0, 9), T(1, 9), T(2, 9), T(3, 9)];
+    s.hands[0] = [...A, ...B, ...C, T(1, 1)];
+    expect(K.open101(s, 0, 'melds', [ids(A), ids(B), ids(C)])).toBe(102);
+    expect(K.openMin(s)).toBe(103);
+    // oyuncu 1: 102 ile açamaz
+    s.current = 1; s.phase = 'play';
+    const A2 = [T(0, 11), T(0, 12), T(0, 13)], B2 = [T(1, 10), T(2, 10), T(3, 10)], C2 = [T(0, 9), T(1, 9), T(2, 9), T(3, 9)];
+    s.hands[1] = [...A2, ...B2, ...C2, T(2, 1)];
+    expect(() => K.open101(s, 1, 'melds', [ids(A2), ids(B2), ids(C2)])).toThrow(/103/);
+    expect(K.view101(s, 1).openMin).toBe(103);
+    // çift: ilk 5, sonra 6
+    expect(K.pairMin(s)).toBe(5);
+    s.maxPairs = 5;
+    expect(K.pairMin(s)).toBe(6);
+    // katlamasız varyantta sabit
+    const s2 = K.newMatch101(createRng(5), { hands: 1 }, 0);
+    s2.maxOpen = 150;
+    expect(K.openMin(s2)).toBe(101);
+  });
 });

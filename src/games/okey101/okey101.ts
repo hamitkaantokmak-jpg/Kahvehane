@@ -36,7 +36,10 @@ export const PAIR_MIN = 5;
 
 export interface Okey101Options {
   hands: number;
-  /** ileride: katlamalı 101 */
+  /**
+   * Katlamalı (yükselen açış) 101: aynı elde her yeni seri açış, o ana kadarki en yüksek seri açıştan
+   * en az 1 fazla olmalı; her yeni çift açış, en çok çiftle açılandan en az 1 çift fazla olmalı.
+   */
   doubling?: boolean;
 }
 
@@ -82,6 +85,9 @@ export interface Okey101State {
   /** Bu tur yapılan hamle var mı (geri koy için). */
   actedThisTurn: boolean;
   penalties: number[];
+  /** Bu eldeki en yüksek seri açış değeri ve en çok çift sayısı (katlamalı için) */
+  maxOpen: number;
+  maxPairs: number;
   totals: number[];
   handNo: number;
   result: Hand101Result | null;
@@ -113,6 +119,8 @@ export function deal101(s: Okey101State, rng: Rng, starter: number) {
   s.phase = 'play';
   s.table = [];
   s.opened = Array(PLAYERS).fill('none');
+  s.maxOpen = 0;
+  s.maxPairs = 0;
   s.takenDiscard = null;
   s.openedThisTurn = false;
   s.openedBeforeTurn = false;
@@ -193,6 +201,15 @@ export function pairValue(a: Tile, b: Tile, ctx: OkeyCtx): number {
 /**
  * El açma. `groups` her biri taş id listesi. Seri açmada her grup bir per, çift açmada her grup 2 taş.
  */
+/** Bu elde seriyle açmak için gereken en düşük değer. */
+export function openMin(s: Pick<Okey101State, 'options' | 'maxOpen'>): number {
+  return s.options.doubling ? Math.max(OPEN_MIN, s.maxOpen + 1) : OPEN_MIN;
+}
+/** Bu elde çiftle açmak için gereken en az çift sayısı. */
+export function pairMin(s: Pick<Okey101State, 'options' | 'maxPairs'>): number {
+  return s.options.doubling ? Math.max(PAIR_MIN, s.maxPairs + 1) : PAIR_MIN;
+}
+
 export function open101(s: Okey101State, p: number, type: 'melds' | 'pairs', groups: number[][]): number {
   assertPlayer(s, p);
   if (s.phase !== 'play') throw new Okey101Error('Önce taş çek.');
@@ -210,18 +227,21 @@ export function open101(s: Okey101State, p: number, type: 'melds' | 'pairs', gro
       total += m.value;
       newMelds.push({ id: 0, owner: p, kind: m.kind, tiles: orderTiles(g, m.slots), slots: m.slots });
     }
-    if (total < OPEN_MIN) throw new Okey101Error(`Açmak için en az ${OPEN_MIN} gerekli (şu an ${total}).`);
+    const need = openMin(s);
+    if (total < need) throw new Okey101Error(`Açmak için en az ${need} gerekli (şu an ${total}).`);
   } else {
     for (const g of tileGroups) {
       if (g.length !== 2 || !isPair(g[0], g[1], s.ctx)) throw new Okey101Error('Geçersiz çift.');
       total++;
       newMelds.push({ id: 0, owner: p, kind: 'pair', tiles: g, slots: pairSlots(g, s.ctx) });
     }
-    if (total < PAIR_MIN) throw new Okey101Error(`Çift açmak için en az ${PAIR_MIN} çift gerekli.`);
+    const needP = pairMin(s);
+    if (total < needP) throw new Okey101Error(`Çift açmak için en az ${needP} çift gerekli.`);
   }
   for (const m of newMelds) { m.id = s.nextMeldId++; s.table.push(m); }
   removeFromHand(s, p, tileGroups.flat());
   s.opened[p] = type;
+  if (type === 'melds') s.maxOpen = Math.max(s.maxOpen, total); else s.maxPairs = Math.max(s.maxPairs, total);
   s.openedThisTurn = true;
   s.actedThisTurn = true;
   s.log.push(`Oyuncu ${p} ${type === 'pairs' ? 'çift' : total} ile açtı.`);
@@ -258,6 +278,48 @@ export function layMeld101(s: Okey101State, p: number, ids: number[]): TableMeld
   removeFromHand(s, p, tiles);
   s.actedThisTurn = true;
   return meld;
+}
+
+/**
+ * Okey değiştirme: masadaki bir perde okeyin temsil ettiği taş elde varsa, okey alınıp yerine o taş konur.
+ * Seride tam kimlik (renk+sayı) gerekir; grupta aynı sayıdan, grupta olmayan renkte bir taş yeter.
+ * Bu uygulamada yalnızca el açmış oyuncu okey alabilir. Sonuç: değiştirilecek slot indeksi ya da -1.
+ */
+export function jokerSwapSlot(meld: TableMeld, tile: Tile, ctx: OkeyCtx): number {
+  if (meld.kind === 'pair' || isJoker(tile, ctx)) return -1;
+  const id = identity(tile, ctx);
+  for (let i = 0; i < meld.slots.length; i++) {
+    const sl = meld.slots[i];
+    const t = meld.tiles.find((x) => x.id === sl.tileId)!;
+    if (!isJoker(t, ctx)) continue;
+    if (meld.kind === 'run' && sl.color === id.color && sl.num === id.num) return i;
+    if (meld.kind === 'group' && sl.num === id.num) {
+      const colors = meld.tiles.filter((x) => !isJoker(x, ctx)).map((x) => identity(x, ctx).color);
+      if (!colors.includes(id.color)) return i;
+    }
+  }
+  return -1;
+}
+
+export function swapJoker101(s: Okey101State, p: number, tileId: number, meldId: number): Tile {
+  assertPlayer(s, p);
+  if (s.phase !== 'play') throw new Okey101Error('Önce taş çek.');
+  if (s.opened[p] === 'none') throw new Okey101Error('Okey almak için önce el açmalısın.');
+  const [tile] = takeFromHand(s, p, [tileId]);
+  const meld = s.table.find((m) => m.id === meldId);
+  if (!meld) throw new Okey101Error('Per bulunamadı.');
+  const i = jokerSwapSlot(meld, tile, s.ctx);
+  if (i < 0) throw new Okey101Error('Bu taşla bu perdeki okey alınamaz.');
+  const sl = meld.slots[i];
+  const joker = meld.tiles.find((x) => x.id === sl.tileId)!;
+  const id = identity(tile, s.ctx);
+  meld.slots[i] = { tileId: tile.id, color: id.color, num: id.num };
+  meld.tiles = meld.tiles.map((x) => (x.id === joker.id ? tile : x));
+  removeFromHand(s, p, [tile]);
+  s.hands[p].push(joker);
+  s.actedThisTurn = true;
+  s.log.push(`Oyuncu ${p} masadan okeyi aldı.`);
+  return joker;
 }
 
 /** Bir taşın masadaki bir pere işlenip işlenemeyeceği. Sonuç: yeni slot listesi. */
@@ -399,6 +461,8 @@ export interface Okey101View {
   current: number;
   takenDiscard: number | null;
   handSizes: number[];
+  openMin: number;
+  pairMin: number;
 }
 
 export function view101(s: Okey101State, p: number): Okey101View {
@@ -416,5 +480,7 @@ export function view101(s: Okey101State, p: number): Okey101View {
     current: s.current,
     takenDiscard: s.takenDiscard,
     handSizes: s.hands.map((h) => h.length),
+    openMin: openMin(s),
+    pairMin: pairMin(s),
   };
 }

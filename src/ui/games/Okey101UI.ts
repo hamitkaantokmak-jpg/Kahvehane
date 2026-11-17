@@ -22,9 +22,9 @@ export class Okey101UI implements GameUI {
   /** Hazırlanan perler (taş id grupları) */
   private staged: number[][] = [];
 
-  constructor(private host: GameHost, hands: number) {
+  constructor(private host: GameHost, hands: number, doubling = false) {
     this.el = h('div', 'gui okey okey101');
-    this.s = K.newMatch101(this.rng, { hands }, 0);
+    this.s = K.newMatch101(this.rng, { hands, doubling }, 0);
     this.rack.multiSelect = true;
     this.board = h('div', 'okey-board compact');
     this.tableEl = h('div', 'meld-table');
@@ -83,6 +83,7 @@ export class Okey101UI implements GameUI {
           this.host.sfx('tableSlam');
         } else if (a.type === 'lay') { K.layMeld101(s, p, a.ids); this.host.sfx('tile'); }
         else if (a.type === 'add') { K.addToMeld101(s, p, a.tileId, a.meldId); this.host.sfx('tile'); }
+        else if (a.type === 'swap') { K.swapJoker101(s, p, a.tileId, a.meldId); this.host.sfx('tile'); this.host.react(p, 'happy', 'Okeyi aldım!'); }
         else {
           const r = K.discard101(s, p, a.tileId);
           this.host.sfx('tile');
@@ -163,6 +164,17 @@ export class Okey101UI implements GameUI {
     if (!this.myTurn || s.phase !== 'play') return;
     if (ids.length !== 1) { this.host.toast('İşlemek için ıstakadan tek taş seç, sonra masadaki pere tıkla.'); return; }
     try {
+      const meld = s.table.find((m) => m.id === meldId)!;
+      const tile = s.hands[0].find((t) => t.id === ids[0])!;
+      if (K.jokerSwapSlot(meld, tile, s.ctx) >= 0) {
+        K.swapJoker101(s, 0, ids[0], meldId);
+        this.host.sfx('tile');
+        this.host.toast('Okeyi masadan aldın!');
+        this.host.react(0, 'slam');
+        this.rack.selected.clear();
+        this.after();
+        return;
+      }
       K.addToMeld101(s, 0, ids[0], meldId);
       this.host.sfx('tile');
       this.rack.selected.clear();
@@ -277,8 +289,8 @@ export class Okey101UI implements GameUI {
         gd.appendChild(btn('✕', 'x', () => { this.staged.splice(gi, 1); this.render(); }));
         wrap.appendChild(gd);
       });
-      const need = s.opened[0] === 'none' ? (info.pairs ? `${info.pairs}/${K.PAIR_MIN} çift` : `${info.value}/${K.OPEN_MIN}`) : `${this.staged.length} per`;
-      this.stageEl.append(h('div', `stage-sum${s.opened[0] === 'none' && (info.value >= K.OPEN_MIN || info.pairs >= K.PAIR_MIN) ? ' ok' : ''}`, `Hazırlanan: <b>${need}</b>`), wrap);
+      const need = s.opened[0] === 'none' ? (info.pairs ? `${info.pairs}/${K.pairMin(s)} çift` : `${info.value}/${K.openMin(s)}`) : `${this.staged.length} per`;
+      this.stageEl.append(h('div', `stage-sum${s.opened[0] === 'none' && (info.value >= K.openMin(s) || info.pairs >= K.pairMin(s)) ? ' ok' : ''}`, `Hazırlanan: <b>${need}</b>`), wrap);
     }
     let msg: string;
     if (s.phase === 'ended') msg = 'El bitti.';
@@ -288,7 +300,7 @@ export class Okey101UI implements GameUI {
       else if (s.opened[0] === 'none') msg = '🟢 Perleri seçip "Per hazırla" ile ekle, 101\'e ulaşınca "Aç". Ya da bir taş at.';
       else msg = '🟢 Per ser, masadaki perlere taş işle (taş seç → pere tıkla), sonra bir taş at.';
     } else msg = `⏳ ${names[s.current]} oynuyor...`;
-    this.status.innerHTML = `${msg} <span class="hand-no">El ${s.handNo}/${s.options.hands} · Toplam: ${s.totals[0]}${s.penalties[0] ? ` · Ceza: ${s.penalties[0]}` : ''}</span>`;
+    this.status.innerHTML = `${msg} <span class="hand-no">El ${s.handNo}/${s.options.hands}${s.options.doubling ? ` · Açış: ${K.openMin(s)} / ${K.pairMin(s)} çift` : ''} · Toplam: ${s.totals[0]}${s.penalties[0] ? ` · Ceza: ${s.penalties[0]}` : ''}</span>`;
     this.renderButtons();
   }
 
@@ -303,7 +315,7 @@ export class Okey101UI implements GameUI {
     if (this.staged.length) {
       const info = this.stagedInfo();
       const label = s.opened[0] === 'none' ? (info.pairs ? 'Çift aç' : 'Aç') : 'Ser';
-      const ok = s.opened[0] !== 'none' || info.value >= K.OPEN_MIN || info.pairs >= K.PAIR_MIN;
+      const ok = s.opened[0] !== 'none' || info.value >= K.openMin(s) || info.pairs >= K.pairMin(s);
       this.btns.appendChild(btn(`${label} ✔`, play && ok ? 'primary glow' : 'primary disabled', () => this.commitStaged()));
     }
     this.btns.appendChild(btn('At', play && sel.length === 1 ? 'primary' : 'primary disabled', () => sel.length === 1 && this.discard(sel[0])));

@@ -87,3 +87,24 @@ test('101: çift açma ve çift serme', async ({ page }) => {
   expect(await withUI(page, 'return s.table.length')).toBe(6);
   expect(errs).toEqual([]);
 });
+
+test('101: masadaki okeyi gerçek taşla değiştirip alma + katlamalı seçeneği', async ({ page }) => {
+  const errs = trackErrors(page);
+  await boot(page);
+  await page.evaluate(() => { const g = (window as any).__game; g.sitDown(g.kahve.tableById('okey2').seats[0]); });
+  await page.locator('.game-card[data-game="okey101"] input[data-o="okey101Doubling"]').check();
+  await page.locator('.game-card[data-game="okey101"] button.primary').click();
+  expect(await withUI(page, 'return s.options.doubling')).toBe(true);
+  await expect(page.locator('.status')).toContainText('Açış: 101');
+  const red5 = await withUI<number>(page, `${PRE}
+    const okey = T(3,7); const run = [T(0,4), okey, T(0,6)];
+    const r5 = T(0,5);
+    s.hands[0] = [r5, T(1,1), T(2,2), T(1,8)]; s.current = 0; s.phase = 'play'; s.opened[0] = 'melds';
+    s.table = [{ id: 77, owner: 1, kind: 'run', tiles: run, slots: [{tileId: run[0].id, color:0, num:4},{tileId: okey.id, color:0, num:5},{tileId: run[2].id, color:0, num:6}] }];
+    ui.rack.slots.fill(null); ui.refresh(); return r5.id;`);
+  await page.locator(`.rack .tile[data-id="${red5}"]`).click();
+  await page.locator('.meld-table .meld').first().click();
+  await expect(page.locator('.rack .tile.joker')).toHaveCount(1);
+  expect(await withUI(page, 'return s.table[0].tiles.map((t) => t.num)')).toEqual([4, 5, 6]);
+  expect(errs).toEqual([]);
+});

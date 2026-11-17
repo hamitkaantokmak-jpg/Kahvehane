@@ -4,12 +4,13 @@
  */
 import { Tile, toCounts, bestPartition, candidatesToTiles, isJoker, identity, isPair, MeldCandidate, OkeyCtx } from '../common/tiles';
 import type { Difficulty } from '../common/types';
-import { Okey101View, RULES_101, OPEN_MIN, PAIR_MIN, tryExtend, TableMeld, checkMeld } from './okey101';
+import { Okey101View, RULES_101, tryExtend, TableMeld, checkMeld, jokerSwapSlot } from './okey101';
 
 export type Bot101Action =
   | { type: 'open'; mode: 'melds' | 'pairs'; groups: number[][] }
   | { type: 'lay'; ids: number[] }
   | { type: 'add'; tileId: number; meldId: number }
+  | { type: 'swap'; tileId: number; meldId: number }
   | { type: 'discard'; tileId: number };
 
 function bestMelds(hand: Tile[], ctx: OkeyCtx, by: 'value' | 'cover') {
@@ -59,10 +60,10 @@ export function decideDraw101(v: Okey101View, diff: Difficulty = 'medium'): 'dec
   if (v.opened[v.me] === 'none') {
     const without = bestMelds(hand, v.ctx, 'value').value;
     const withTop = bestMelds([...hand, top], v.ctx, 'value').value;
-    if (without < OPEN_MIN && withTop >= OPEN_MIN && withTop > without) return 'discard';
+    if (without < v.openMin && withTop >= v.openMin && withTop > without) return 'discard';
     const pw = findPairs(hand, v.ctx).length;
     const pt = findPairs([...hand, top], v.ctx, top.id);
-    if (pw < PAIR_MIN && pt.length >= PAIR_MIN && pt.some((p) => p.includes(top))) return 'discard';
+    if (pw < v.pairMin && pt.length >= v.pairMin && pt.some((p) => p.includes(top))) return 'discard';
     return 'deck';
   }
   if (v.opened[v.me] === 'melds') {
@@ -88,6 +89,10 @@ export function planTurn101(v: Okey101View, rng: () => number = Math.random, dif
   const table: TableMeld[] = v.table.map((m) => ({ ...m, tiles: [...m.tiles], slots: [...m.slots] }));
   const actions: Bot101Action[] = [];
   let opened = v.opened[v.me];
+  // açtıysa ve elde masadaki okeyin yerini tutan taş varsa: önce okeyi al
+  if (opened !== 'none' && diff !== 'easy') {
+    for (const m of v.table) for (const t of hand) if (jokerSwapSlot(m, t, ctx) >= 0) return [{ type: 'swap', tileId: t.id, meldId: m.id }];
+  }
   const remove = (tiles: Tile[]) => { hand = hand.filter((t) => !tiles.includes(t)); };
   let fakeId = -1;
 
@@ -96,7 +101,7 @@ export function planTurn101(v: Okey101View, rng: () => number = Math.random, dif
     let best = bestMelds(hand, ctx, 'value');
     if (diff === 'hard') {
       const cover = bestMelds(hand, ctx, 'cover');
-      if (cover.value >= OPEN_MIN) best = cover;
+      if (cover.value >= v.openMin) best = cover;
     }
     let groups = candidatesToTiles(best.melds, hand, ctx);
     // en az bir taş kalmalı
@@ -104,12 +109,12 @@ export function planTurn101(v: Okey101View, rng: () => number = Math.random, dif
       groups.sort((a, b) => a.length - b.length);
       const alt = groups.slice(1);
       const altVal = alt.reduce((a, g) => a + (checkMeld(g, ctx)?.value ?? 0), 0);
-      groups = altVal >= OPEN_MIN ? alt : [];
+      groups = altVal >= v.openMin ? alt : [];
     }
     const total = groups.reduce((a, g) => a + (checkMeld(g, ctx)?.value ?? 0), 0);
     const pairs = findPairs(hand, ctx, v.takenDiscard);
-    const pairsOk = pairs.length >= PAIR_MIN && pairs.flat().length < hand.length;
-    if (total >= OPEN_MIN && !(pairsOk && pairs.length >= 6 && total < 130)) {
+    const pairsOk = pairs.length >= v.pairMin && pairs.flat().length < hand.length;
+    if (total >= v.openMin && !(pairsOk && pairs.length >= 6 && total < 130)) {
       actions.push({ type: 'open', mode: 'melds', groups: groups.map((g) => g.map((t) => t.id)) });
       groups.forEach((g) => { const m = checkMeld(g, ctx)!; table.push({ id: fakeId--, owner: v.me, kind: m.kind, tiles: g, slots: m.slots }); });
       remove(groups.flat());

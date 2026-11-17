@@ -29,7 +29,15 @@ Mobil: sol yarı sanal joystick (uzağa çekince koşar), sağ yarı kamera, ✋
 | `src/audio` | WebAudio ile prosedürel sesler (dosya yok → telif riski yok) |
 | `src/save` | Ayarlar + istatistik (localStorage) |
 
-Botlar yalnızca `viewFor/view101/viewPisti` görünümlerini alır; gizli taş/kart bilgisi verilmez.
+Botlar yalnızca `viewFor/view101/viewPisti` görünümlerini alır; gizli taş/kart bilgisi verilmez (birim testle doğrulanır).
+Bot seviyeleri: Kolay / Orta / Zor (oyun seçim ekranında).
+
+## Testler
+```
+npm test          # birim testleri (kurallar, botlar, zorluk, gizli bilgi)
+npm run e2e       # Playwright uçtan uca testleri (tests/e2e) — --trace off
+```
+Test kancaları: `?speed=N` bot beklemelerini, `?gspeed=N` oyun zamanını hızlandırır; `window.__game.session.ui` ve `ui.refresh()`.
 
 ## Uygulanan kural varyantları
 **Klasik Okey:** 106 taş, başlayan 15 / diğerleri 14. Gösterge +1 = okey (13→1), sahte okey okeyin yerine geçer.
@@ -42,7 +50,11 @@ yeni per serme (seriyle açan seri/grup, çiftle açan çift) ve masadaki seri/g
 Yerden alınan taş o tur kullanılmalı (bu uygulamada ceza yerine "geri koy" hakkı var). İşlek taş ya da okey atmak +101.
 Puan: kazanan −101; elden bitme ×2, okey atarak bitme ×2; açmayan +202×çarpan, açan el toplamı×çarpan (okey 101),
 çiftçi ×2. Deste biterse kazanan yok. Seri maç: seçilen el sayısı, en düşük toplam kazanır.
-Okeyi masadan gerçek taşla değiştirme ve katlamalı 101 henüz yok (`Okey101Options` genişletilebilir).
+**Okey alma:** El açmış oyuncu, masadaki bir perde okeyin temsil ettiği taş elindeyse onu pere koyup okeyi eline alabilir
+(seride tam renk+sayı, grupta eksik renkten aynı sayı). Ceza uyarısı oyunun kendi penceresiyle gösterilir.
+**Katlamalı 101 (seçenek, "yükselen açış"):** aynı elde her yeni seri açış o ana kadarki en yüksek seri açıştan en az 1 fazla,
+her yeni çift açış en çok çiftle açılandan en az 1 çift fazla olmalıdır. Puanlama standart 101 ile aynıdır.
+(Katlamalı 101'in bölgeden bölgeye farklı yorumları vardır; burada yükselen açış eşiği uygulanmıştır.)
 
 **Tavla:** 24 hane, 15'er pul, standart diziliş. Açılışta büyük zar atan başlar ve zarları yeniden atar. Azami zar
 kullanımı ve "tek zar oynanabiliyorsa büyüğü" kuralı, kırma/bar, kapalı hane, toplama (büyük zarla en gerideki).

@@ -39,6 +39,7 @@ export interface GameUI {
 
 export interface GameOptions {
   okey101Hands: number;
+  okey101Doubling: boolean;
   difficulty: Difficulty;
   tavlaKatmerli: boolean;
   tavlaTarget: number;
@@ -54,7 +55,7 @@ export class TableSession implements GameHost {
   ui: GameUI | null = null;
   private exitConfirm: HTMLDivElement | null = null;
   readonly table3d: TableView3D;
-  options: GameOptions = { difficulty: 'medium', okey101Hands: 3, tavlaKatmerli: true, tavlaTarget: 5, pistiTarget: 151 };
+  options: GameOptions = { difficulty: 'medium', okey101Hands: 3, okey101Doubling: false, tavlaKatmerli: true, tavlaTarget: 5, pistiTarget: 151 };
 
   constructor(private game: Game, readonly seat: Seat) {
     this.root = h('div', 'game-root');
@@ -78,7 +79,8 @@ export class TableSession implements GameHost {
       card.innerHTML = `<div class="gc-title">${m.name}</div><div class="gc-desc">${m.description}</div><div class="gc-players">${m.players} oyuncu</div>`;
       const opts = h('div', 'gc-opts');
       if (gid === 'okey101') {
-        opts.innerHTML = `<label>El sayısı <select data-o="okey101Hands"><option value="1">1</option><option value="3" selected>3</option><option value="5">5</option><option value="7">7</option></select></label>`;
+        opts.innerHTML = `<label>El sayısı <select data-o="okey101Hands"><option value="1">1</option><option value="3" selected>3</option><option value="5">5</option><option value="7">7</option></select></label>
+          <label class="row"><input type="checkbox" data-o="okey101Doubling"> Katlamalı (yükselen açış)</label>`;
       } else if (gid === 'tavla') {
         opts.innerHTML = `<label>Maç <select data-o="tavlaTarget"><option value="1">1 puan</option><option value="3">3 puan</option><option value="5" selected>5 puan</option></select></label>
           <label class="row"><input type="checkbox" data-o="tavlaKatmerli" checked> Katmerli mars (3 puan)</label>`;
@@ -183,7 +185,7 @@ export class TableSession implements GameHost {
   private createUI(gid: GameId): GameUI {
     switch (gid) {
       case 'okey': return new OkeyUI(this);
-      case 'okey101': return new Okey101UI(this, this.options.okey101Hands);
+      case 'okey101': return new Okey101UI(this, this.options.okey101Hands, this.options.okey101Doubling);
       case 'tavla': return new TavlaUI(this, { target: this.options.tavlaTarget, katmerliMars: this.options.tavlaKatmerli });
       case 'pisti2': return new PistiUI(this, { players: 2, target: this.options.pistiTarget });
       case 'pisti4': return new PistiUI(this, { players: 4, target: this.options.pistiTarget });

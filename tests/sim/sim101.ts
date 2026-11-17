@@ -19,6 +19,7 @@ export function simulate101(n: number, diff: Difficulty, seed0 = 1) {
         if (a.type === 'open') K.open101(s, p, a.mode, a.groups);
         else if (a.type === 'lay') K.layMeld101(s, p, a.ids);
         else if (a.type === 'add') K.addToMeld101(s, p, a.tileId, a.meldId);
+        else if (a.type === 'swap') K.swapJoker101(s, p, a.tileId, a.meldId);
         else K.discard101(s, p, a.tileId);
       }
     }
