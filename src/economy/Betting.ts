@@ -7,6 +7,8 @@
  *  - 101: seri maçta en yüksek toplamı alan(lar) öder → en düşük toplamlı(lar) alır.
  *  - Tavla: her oyunda kaybeden öder: normal 1×, mars 2×, katmerli mars 3×.
  *  - Pişti: kaybeden takım(ın her üyesi) öder → kazanan takım(ın üyeleri) alır.
+ *  - Batak: toplamı en düşük olan öder → en yüksek olan alır (eşlide takımca).
+ *  - King: toplamı en düşük olan öder → en yüksek olan alır.
  */
 import { BASE_PRICES, EconomyState, PLAYER, credit, playerPay, balanceOf } from './Economy';
 
@@ -58,6 +60,20 @@ export function pistiOutcome(sideTotals: number[], players: 2 | 4): Outcome | nu
   const side = (p: number) => (players === 4 ? p % 2 : p);
   const all = Array.from({ length: players }, (_, i) => i);
   return { payers: all.filter((p) => side(p) === lose), winners: all.filter((p) => side(p) !== lose), multiplier: 1 };
+}
+
+/** Batak: toplamı en düşük öder, en yüksek alır; eşlide ortaklar birlikte (toplamları zaten eşit) */
+export function batakOutcome(totals: number[]): Outcome | null {
+  const payers = minIdx(totals), winners = maxIdx(totals);
+  if (payers.length === totals.length) return null;
+  return { payers, winners, multiplier: 1 };
+}
+
+/** King: toplamı en düşük öder, en yüksek alır */
+export function kingOutcome(totals: number[]): Outcome | null {
+  const payers = minIdx(totals), winners = maxIdx(totals);
+  if (payers.length === totals.length) return null;
+  return { payers, winners, multiplier: 1 };
 }
 
 /**

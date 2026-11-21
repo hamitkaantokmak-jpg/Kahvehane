@@ -50,7 +50,7 @@ test('Mobil: joystick ile yürüme, kamera kaydırma, etkileşim düğmesi', asy
 });
 
 for (const orient of ['dikey', 'yatay'] as const) {
-  for (const gid of ['okey', 'okey101', 'tavla', 'pisti2', 'pisti4']) {
+  for (const gid of ['okey', 'okey101', 'tavla', 'pisti2', 'pisti4', 'batak', 'king']) {
     test(`Mobil ${orient}: ${gid} arayüzü ekrana sığıyor`, async ({ page }) => {
       if (orient === 'yatay') await page.setViewportSize({ width: 844, height: 390 });
       const errs = trackErrors(page);
@@ -62,6 +62,8 @@ for (const orient of ['dikey', 'yatay'] as const) {
         tavla: ['.tboard', '.tside', '.gbtns button'],
         pisti2: ['.ptable', '.phand', '.gbtns button'],
         pisti4: ['.ptable', '.phand', '.gbtns button'],
+        batak: ['.trick-table', '.tcenter', '.phand', '.bid-panel', '.gbtns button'],
+        king: ['.trick-table', '.tcenter', '.phand', '.bid-panel', '.gbtns button'],
       };
       await page.waitForTimeout(500);
       for (const s of sels[gid]) await fits(page, s);

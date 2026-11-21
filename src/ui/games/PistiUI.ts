@@ -5,7 +5,7 @@ import { createRng } from '../../games/common/rng';
 import { GameHost, GameUI } from '../../tables/TableSession';
 import { h, btn, later } from '../dom';
 
-function cardEl(c: P.Card | null, opts: { back?: boolean; small?: boolean } = {}): HTMLDivElement {
+export function cardEl(c: P.Card | null, opts: { back?: boolean; small?: boolean } = {}): HTMLDivElement {
   const el = h('div', `card${opts.back ? ' back' : ''}${opts.small ? ' small' : ''}`);
   if (!c || opts.back) return el;
   const red = c.suit === 1 || c.suit === 2;

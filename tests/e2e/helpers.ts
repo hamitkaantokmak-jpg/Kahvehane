@@ -15,7 +15,7 @@ export async function boot(page: Page, query = 'speed=12') {
   await page.waitForFunction(() => !!(window as unknown as W).__game && (window as unknown as W).__game.frame > 3);
 }
 
-const TABLE_FOR: Record<string, string> = { okey: 'okey2', okey101: 'okey2', tavla: 'tavla2', pisti2: 'kart2', pisti4: 'kart2' };
+const TABLE_FOR: Record<string, string> = { okey: 'okey2', okey101: 'okey2', tavla: 'tavla2', pisti2: 'kart2', pisti4: 'kart2', batak: 'kart2', king: 'kart2' };
 
 /** Bir masaya oturup oyunu başlatır. */
 export async function openGame(page: Page, gid: string, setup?: string) {

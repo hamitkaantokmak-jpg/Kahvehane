@@ -3,7 +3,7 @@
 export type Difficulty = 'easy' | 'medium' | 'hard';
 export const DIFFICULTY_TR: Record<Difficulty, string> = { easy: 'Kolay', medium: 'Orta', hard: 'Zor' };
 
-export type GameId = 'okey' | 'okey101' | 'tavla' | 'pisti2' | 'pisti4';
+export type GameId = 'okey' | 'okey101' | 'tavla' | 'pisti2' | 'pisti4' | 'batak' | 'king';
 
 export interface GameMeta {
   id: GameId;
@@ -18,4 +18,6 @@ export const GAME_META: Record<GameId, GameMeta> = {
   tavla: { id: 'tavla', name: 'Tavla', players: 2, description: '24 hane, 15\'er pul, kırma, mars. 5 puanlık maç.' },
   pisti2: { id: 'pisti2', name: 'Pişti (2 kişi)', players: 2, description: 'Tek rakip, 52 kart, 151 puana kadar.' },
   pisti4: { id: 'pisti4', name: 'Pişti (4 kişi)', players: 4, description: 'Karşılıklı takımlar, 52 kart, 151 puana kadar.' },
+  batak: { id: 'batak', name: 'İhaleli Batak', players: 4, description: 'İhale ver, kozu seç, sözünü tut. Tekli ya da eşli.' },
+  king: { id: 'king', name: 'King', players: 4, description: 'Herkes 2 koz + 3 ceza seçer: el, kupa, erkek, kız, rıfkı, son iki.' },
 };
