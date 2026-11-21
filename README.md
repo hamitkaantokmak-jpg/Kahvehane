@@ -52,6 +52,17 @@ npm run e2e       # Playwright uçtan uca testleri (tests/e2e) — --trace off
 ```
 Test kancaları: `?speed=N` bot beklemelerini, `?gspeed=N` oyun zamanını hızlandırır; `window.__game.session.ui` ve `ui.refresh()`.
 
+## Okey masası (masaya odaklı görünüm)
+Klasik Okey ve 101, yukarıdan bakılan yeşil çuha bir masada oynanır (`src/ui/games/OkeyTable.ts`, yalnızca çizim):
+- Her oyuncu kendi kenarında: **sen altta**, sağında 1, karşında 2, solunda 3; sıra sağdan döner (0 → 1 → 2 → 3).
+  Sırası gelen oyuncunun kenarı ve isim plakası parlar.
+- **101'de herkes açtığı perleri kendi önüne koyar.** Hazırladığın (henüz açmadığın) perler de senin önünde kesik çizgiyle durur.
+  Istakadan tek taş seçince işlenebilecek perler (kimin önünde olursa olsun) parlar; pere dokununca işlenir.
+- Atılan taşlar gerçek masadaki gibi her oyuncunun sağındaki köşede yığılır: senin attıkların sağ altta,
+  alabileceğin taş (soldakinin attığı) sol altta. Ortada deste, gösterge ve okey.
+- Dar ekranda yan ve karşı kenarlardaki perler küçük çizilir; o kenara dokununca büyük görünüm açılır.
+  Yatay telefonda ıstaka solda, durum ve düğmeler sağda durur.
+
 ## Uygulanan kural varyantları
 **Klasik Okey:** 106 taş, başlayan 15 / diğerleri 14. Gösterge +1 = okey (13→1), sahte okey okeyin yerine geçer.
 Seri aynı renk ardışık ≥3 (12-13-1 geçerli, 13-1-2 geçersiz), grup aynı sayı farklı renk 3-4, 7 çift.

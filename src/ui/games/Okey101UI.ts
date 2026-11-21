@@ -5,7 +5,8 @@ import { createRng } from '../../games/common/rng';
 import { Tile, isJoker, isPair } from '../../games/common/tiles';
 import { GameHost, GameUI } from '../../tables/TableSession';
 import { h, btn, later } from '../dom';
-import { Rack, tileEl } from './TileView';
+import { Rack } from './TileView';
+import { OkeyTable } from './OkeyTable';
 
 export class Okey101UI implements GameUI {
   readonly el: HTMLDivElement;
@@ -15,9 +16,7 @@ export class Okey101UI implements GameUI {
   private alive = true;
   private botTimer = 0;
   private status!: HTMLDivElement;
-  private board!: HTMLDivElement;
-  private tableEl!: HTMLDivElement;
-  private stageEl!: HTMLDivElement;
+  private table!: OkeyTable;
   private btns!: HTMLDivElement;
   /** Hazırlanan perler (taş id grupları) */
   private staged: number[][] = [];
@@ -26,13 +25,17 @@ export class Okey101UI implements GameUI {
     this.el = h('div', 'gui okey okey101');
     this.s = K.newMatch101(this.rng, { hands, doubling }, 0);
     this.rack.multiSelect = true;
-    this.board = h('div', 'okey-board compact');
-    this.tableEl = h('div', 'meld-table');
-    this.stageEl = h('div', 'stage');
+    this.table = new OkeyTable({ onDeck: () => this.drawDeck(), onLeft: () => this.drawLeft(), onMeld: (id) => this.addToMeld(id) });
     this.status = h('div', 'status');
     this.btns = h('div', 'gbtns');
-    this.el.append(this.board, this.tableEl, this.stageEl, this.status, this.rack.el, this.btns);
-    this.rack.onSelect = () => this.renderButtons();
+    // alt bölüm: durum + ıstaka + düğmeler (yatay telefonda ıstaka solda, durum ve düğmeler sağda)
+    const dock = h('div', 'odock');
+    const side = h('div', 'oside');
+    side.append(this.status, this.btns);
+    dock.append(this.rack.el, side);
+    this.el.append(this.table.el, dock);
+    this.rack.dropTargets = [{ el: this.table.myPile, onDrop: (id) => this.discard(id), accept: () => this.myTurn && this.s.phase === 'play' }];
+    this.rack.onSelect = () => { this.renderTable(); this.renderButtons(); };
     this.rack.onChange = () => this.sync3d();
     this.rack.sync(this.s.hands[0], this.s.ctx);
     this.rack.arrangeMelds(K.RULES_101);
@@ -120,6 +123,24 @@ export class Okey101UI implements GameUI {
   // ------------------------------------------------------------ insan
   private tilesOf(ids: number[]): Tile[] {
     return ids.map((id) => this.s.hands[0].find((t) => t.id === id)!).filter(Boolean);
+  }
+
+  private drawDeck() {
+    const s = this.s;
+    if (!this.myTurn || s.phase !== 'draw') return;
+    const t = K.drawDeck101(s, 0);
+    this.rack.highlight = t.id;
+    this.host.sfx('tile');
+    this.after();
+  }
+
+  private drawLeft() {
+    const s = this.s;
+    if (!this.myTurn || s.phase !== 'draw' || !s.discards[3].length) return;
+    K.drawDiscard101(s, 0);
+    this.host.sfx('tile');
+    this.host.toast(s.opened[0] === 'none' ? 'Yerden aldın: bu tur bu taşla açmalısın!' : 'Yerden aldın: bu tur kullanmalısın!');
+    this.after();
   }
 
   private stageSelected() {
@@ -239,71 +260,7 @@ export class Okey101UI implements GameUI {
     const names = this.host.names;
     this.rack.disabledIds = new Set(this.staged.flat());
     this.rack.sync(s.hands[0], s.ctx);
-    const openTxt = (o: K.OpenType) => (o === 'none' ? 'açmadı' : o === 'pairs' ? 'çift açtı' : 'açtı');
-    this.board.innerHTML = '';
-    const players = h('div', 'p101');
-    for (let i = 1; i < 4; i++) {
-      const d = h('div', `opp${s.current === i && s.phase !== 'ended' ? ' turn' : ''}`);
-      const top = s.discards[i][s.discards[i].length - 1];
-      d.innerHTML = `<div class="nm">${names[i]}</div><div class="meta">${s.hands[i].length} taş · ${openTxt(s.opened[i])} · ${s.totals[i]}</div>`;
-      const pile = h('div', `pile mini${i === 3 && this.myTurn && s.phase === 'draw' && top ? ' clickable glow' : ''}`);
-      if (top) pile.appendChild(tileEl(top, s.ctx, { small: true }));
-      if (i === 3) pile.addEventListener('click', () => {
-        if (!this.myTurn || s.phase !== 'draw' || !top) return;
-        K.drawDiscard101(s, 0);
-        this.host.sfx('tile');
-        this.host.toast(s.opened[0] === 'none' ? 'Yerden aldın: bu tur bu taşla açmalısın!' : 'Yerden aldın: bu tur kullanmalısın!');
-        this.after();
-      });
-      d.appendChild(pile);
-      players.appendChild(d);
-    }
-    const center = h('div', 'ob-center');
-    const deck = h('div', `deck${this.myTurn && s.phase === 'draw' ? ' clickable glow' : ''}`);
-    deck.innerHTML = `<div class="tile back small"></div><div class="cnt">${s.deck.length}</div>`;
-    deck.addEventListener('click', () => {
-      if (!this.myTurn || s.phase !== 'draw') return;
-      const t = K.drawDeck101(s, 0);
-      this.rack.highlight = t.id;
-      this.host.sfx('tile');
-      this.after();
-    });
-    const ind = h('div', 'indicator');
-    ind.appendChild(tileEl(s.indicator, null, { small: true }));
-    center.append(deck, ind);
-    const mine = h('div', `pile mini p-mine drop`);
-    const myTop = s.discards[0][s.discards[0].length - 1];
-    if (myTop) mine.appendChild(tileEl(myTop, s.ctx, { small: true }));
-    mine.appendChild(h('div', 'pl', 'At'));
-    players.append(center, mine);
-    this.board.appendChild(players);
-    this.rack.dropTargets = [{ el: mine, onDrop: (id) => this.discard(id), accept: () => this.myTurn && s.phase === 'play' }];
-
-    // masadaki perler
-    this.tableEl.innerHTML = '';
-    if (!s.table.length) this.tableEl.appendChild(h('div', 'muted', 'Masada henüz açılmış per yok. Açmak için 101 puan ya da 5 çift gerekir.'));
-    for (const m of s.table) {
-      const md = h('div', `meld ${m.kind}${this.myTurn && s.opened[0] !== 'none' && this.rack.selected.size === 1 && m.kind !== 'pair' ? ' target' : ''}`);
-      md.title = `${names[m.owner]} — tıkla: seçili taşı işle`;
-      md.appendChild(h('span', 'owner', names[m.owner].split(' ')[0]));
-      for (const t of m.tiles) md.appendChild(tileEl(t, s.ctx, { small: true }));
-      md.addEventListener('click', () => this.addToMeld(m.id));
-      this.tableEl.appendChild(md);
-    }
-    // hazırlık alanı
-    this.stageEl.innerHTML = '';
-    if (this.staged.length) {
-      const info = this.stagedInfo();
-      const wrap = h('div', 'staged-list');
-      this.staged.forEach((g, gi) => {
-        const gd = h('div', 'meld staged');
-        for (const t of this.tilesOf(g)) gd.appendChild(tileEl(t, s.ctx, { small: true }));
-        gd.appendChild(btn('✕', 'x', () => { this.staged.splice(gi, 1); this.render(); }));
-        wrap.appendChild(gd);
-      });
-      const need = s.opened[0] === 'none' ? (info.pairs ? `${info.pairs}/${K.pairMin(s)} çift` : `${info.value}/${K.openMin(s)}`) : `${this.staged.length} per`;
-      this.stageEl.append(h('div', `stage-sum${s.opened[0] === 'none' && (info.value >= K.openMin(s) || info.pairs >= K.pairMin(s)) ? ' ok' : ''}`, `Hazırlanan: <b>${need}</b>`), wrap);
-    }
+    this.renderTable();
     let msg: string;
     if (s.phase === 'ended') msg = 'El bitti.';
     else if (s.current === 0) {
@@ -314,6 +271,35 @@ export class Okey101UI implements GameUI {
     } else msg = `⏳ ${names[s.current]} oynuyor...`;
     this.status.innerHTML = `${msg} <span class="hand-no">El ${s.handNo}/${s.options.hands}${s.options.doubling ? ` · Açış: ${K.openMin(s)} / ${K.pairMin(s)} çift` : ''} · Toplam: ${s.totals[0]}${s.penalties[0] ? ` · Ceza: ${s.penalties[0]}` : ''}</span>`;
     this.renderButtons();
+  }
+
+  /** Masa (her oyuncunun önü, köşelerdeki atılan taşlar, deste) */
+  private renderTable() {
+    const s = this.s;
+    const names = this.host.names;
+    const live = s.phase !== 'ended';
+    const openTxt = (o: K.OpenType) => (o === 'none' ? 'açmadı' : o === 'pairs' ? 'çift' : 'açtı');
+    const info = this.staged.length ? this.stagedInfo() : null;
+    const oneSel = this.myTurn && s.phase === 'play' && s.opened[0] !== 'none' && this.rack.selected.size === 1;
+    this.table.render({
+      seats: s.hands.map((hand, i) => ({ name: i === 0 ? 'Sen' : names[i], count: hand.length, meta: `${openTxt(s.opened[i])} · <b>${s.totals[i]}</b>`, turn: live && s.current === i, opened: s.opened[i] !== 'none' })),
+      discards: s.discards,
+      ctx: s.ctx,
+      indicator: s.indicator,
+      deckCount: s.deck.length,
+      canDrawDeck: this.myTurn && s.phase === 'draw',
+      canDrawLeft: this.myTurn && s.phase === 'draw' && s.discards[3].length > 0,
+      canDrop: this.myTurn && s.phase === 'play',
+      showOkeyInfo: true,
+      melds: s.table.map((m) => ({ id: m.id, owner: m.owner, tiles: m.tiles, kind: m.kind })),
+      meldTarget: (m) => oneSel && m.kind !== 'pair',
+      staged: this.staged.map((g, gi) => ({ tiles: this.tilesOf(g), onRemove: () => { this.staged.splice(gi, 1); this.render(); } })),
+      stagedSum: info ? {
+        html: `Hazırlanan: <b>${s.opened[0] === 'none' ? (info.pairs ? `${info.pairs}/${K.pairMin(s)} çift` : `${info.value}/${K.openMin(s)}`) : `${this.staged.length} per`}</b>`,
+        ok: s.opened[0] !== 'none' || info.value >= K.openMin(s) || info.pairs >= K.pairMin(s),
+      } : null,
+      emptyHint: s.opened[0] === 'none' ? `Açmak için ${K.openMin(s)} puan ya da ${K.pairMin(s)} çift. Perlerin burada, senin önünde durur.` : '',
+    });
   }
 
   private renderButtons() {

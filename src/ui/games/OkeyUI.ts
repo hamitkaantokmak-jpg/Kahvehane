@@ -5,7 +5,8 @@ import { createRng } from '../../games/common/rng';
 import { isJoker } from '../../games/common/tiles';
 import { GameHost, GameUI } from '../../tables/TableSession';
 import { h, btn, later } from '../dom';
-import { Rack, tileEl } from './TileView';
+import { Rack } from './TileView';
+import { OkeyTable } from './OkeyTable';
 
 const KIND_TR: Record<string, string> = { normal: 'normal bitti', okey: 'okey atarak bitti', pairs: 'çiftten bitti', pairsOkey: 'çiftten okey atarak bitti', deckEmpty: 'deste bitti' };
 
@@ -17,9 +18,8 @@ export class OkeyUI implements GameUI {
   private alive = true;
   private botTimer = 0;
   private status!: HTMLDivElement;
-  private board!: HTMLDivElement;
+  private table!: OkeyTable;
   private btns!: HTMLDivElement;
-  private myPile!: HTMLDivElement;
 
   constructor(private host: GameHost) {
     this.el = h('div', 'gui okey');
@@ -32,10 +32,16 @@ export class OkeyUI implements GameUI {
   }
 
   private build() {
-    this.board = h('div', 'okey-board');
+    this.table = new OkeyTable({ onDeck: () => this.drawDeck(), onLeft: () => this.drawLeft() });
     this.status = h('div', 'status');
     this.btns = h('div', 'gbtns');
-    this.el.append(this.board, this.status, this.rack.el, this.btns);
+    // alt bölüm: durum + ıstaka + düğmeler (yatay telefonda ıstaka solda, durum ve düğmeler sağda)
+    const dock = h('div', 'odock');
+    const side = h('div', 'oside');
+    side.append(this.status, this.btns);
+    dock.append(this.rack.el, side);
+    this.el.append(this.table.el, dock);
+    this.rack.dropTargets = [{ el: this.table.myPile, onDrop: (id) => this.discard(id), accept: () => this.myTurn() && this.s.phase === 'discard' }];
     this.rack.onSelect = () => this.renderButtons();
     this.rack.onChange = () => this.sync3d();
   }
@@ -113,7 +119,7 @@ export class OkeyUI implements GameUI {
   }
 
   private drawLeft() {
-    if (!this.myTurn() || !O.canTakeDiscard(this.s, 0)) return;
+    if (!this.myTurn() || this.s.phase !== 'draw' || !O.canTakeDiscard(this.s, 0)) return;
     const t = O.drawFromDiscard(this.s, 0);
     this.host.sfx('tile');
     this.rack.highlight = t.id;
@@ -157,42 +163,18 @@ export class OkeyUI implements GameUI {
     const s = this.s;
     const names = this.host.names;
     this.rack.sync(s.hands[0], s.ctx);
-    const opp = (i: number, pos: string) => {
-      const d = h('div', `opp ${pos}${s.current === i && s.phase !== 'ended' ? ' turn' : ''}`);
-      d.innerHTML = `<div class="nm">${names[i]}</div><div class="meta">${s.hands[i].length} taş · <b>${s.scores[i]}</b> puan</div>`;
-      return d;
-    };
-    const pile = (i: number, cls: string, clickable: boolean) => {
-      const d = h('div', `pile ${cls}${clickable ? ' clickable' : ''}`);
-      const top = s.discards[i][s.discards[i].length - 1];
-      if (top) d.appendChild(tileEl(top, s.ctx));
-      else d.appendChild(h('div', 'empty', '—'));
-      d.appendChild(h('div', 'pl', `${names[i]} (${s.discards[i].length})`));
-      if (clickable) d.addEventListener('click', () => this.drawLeft());
-      return d;
-    };
-    this.board.innerHTML = '';
-    const top = h('div', 'ob-top');
-    top.append(opp(2, 'top'), pile(2, 'p-top', false));
-    const mid = h('div', 'ob-mid');
-    const leftCol = h('div', 'ob-side');
-    leftCol.append(opp(3, 'left'), pile(3, 'p-left', this.myTurn() && s.phase === 'draw' && s.discards[3].length > 0));
-    const center = h('div', 'ob-center');
-    const deck = h('div', `deck${this.myTurn() && s.phase === 'draw' ? ' clickable glow' : ''}`);
-    deck.innerHTML = `<div class="tile back"></div><div class="cnt">${s.deck.length}</div><div class="pl">Deste</div>`;
-    deck.addEventListener('click', () => this.drawDeck());
-    const ind = h('div', 'indicator');
-    ind.appendChild(tileEl(s.indicator, null));
-    ind.appendChild(h('div', 'pl', 'Gösterge'));
-    const okeyInfo = h('div', 'okeyinfo', `Okey: <b style="color:${['#d62828', '#e9a100', '#1d5fc4', '#222'][s.ctx.okeyColor]}">${s.ctx.okeyNum}</b>`);
-    center.append(deck, ind, okeyInfo);
-    const rightCol = h('div', 'ob-side');
-    rightCol.append(opp(1, 'right'), pile(1, 'p-right', false));
-    mid.append(leftCol, center, rightCol);
-    this.myPile = pile(0, 'p-mine drop', false);
-    this.myPile.querySelector('.pl')!.textContent = 'Atmak için buraya sürükle';
-    this.board.append(top, mid, this.myPile);
-    this.rack.dropTargets = [{ el: this.myPile, onDrop: (id) => this.discard(id), accept: () => this.myTurn() && s.phase === 'discard' }];
+    const live = s.phase !== 'ended';
+    this.table.render({
+      seats: s.hands.map((hand, i) => ({ name: i === 0 ? 'Sen' : names[i], count: hand.length, meta: `<b>${s.scores[i]}</b> puan`, turn: live && s.current === i })),
+      discards: s.discards,
+      ctx: s.ctx,
+      indicator: s.indicator,
+      deckCount: s.deck.length,
+      canDrawDeck: this.myTurn() && s.phase === 'draw',
+      canDrawLeft: this.myTurn() && s.phase === 'draw' && s.discards[3].length > 0,
+      canDrop: this.myTurn() && s.phase === 'discard',
+      showOkeyInfo: true,
+    });
     // durum
     let msg = '';
     if (s.phase === 'ended') msg = 'El bitti.';

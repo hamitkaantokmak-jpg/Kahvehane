@@ -57,8 +57,8 @@ for (const orient of ['dikey', 'yatay'] as const) {
       await boot(page);
       await openGame(page, gid);
       const sels: Record<string, string[]> = {
-        okey: ['.rack', '.gbtns button', '.ob-center', '.status'],
-        okey101: ['.rack', '.gbtns button', '.meld-table', '.status'],
+        okey: ['.rack', '.gbtns button', '.otable', '.ocenter', '.status'],
+        okey101: ['.rack', '.gbtns button', '.otable', '.ocenter', '.status'],
         tavla: ['.tboard', '.tside', '.gbtns button'],
         pisti2: ['.ptable', '.phand', '.gbtns button'],
         pisti4: ['.ptable', '.phand', '.gbtns button'],
