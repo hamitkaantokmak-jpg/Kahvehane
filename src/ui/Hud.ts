@@ -21,6 +21,7 @@ export class Hud {
   onEmote: (id: EmoteId) => void = () => {};
   onSettings: (s: Settings) => void = () => {};
   onResume: () => void = () => {};
+  onCreator: () => void = () => {};
   paused = false;
 
   constructor(parent: HTMLElement, private input: Input, private settings: Settings) {
@@ -37,7 +38,7 @@ export class Hud {
       <div class="tea-overlay" id="teaOverlay"></div>
       <div class="help" id="help">
         <b>WASD</b> yürü · <b>Shift</b> koş · <b>Fare</b> kamera (tıkla/sürükle) · <b>E</b> etkileşim / otur<br/>
-        <b>F</b> ıstakayla şaplak · <b>G</b> çay fırlat · <b>Q</b> hareketler · <b>1-8</b> hızlı hareket · <b>T</b> çay iste · <b>Esc</b> menü
+        <b>F</b> ıstakayla şaplak · <b>G</b> çay fırlat · <b>Q</b> hareketler · <b>1-8</b> hızlı hareket · <b>T</b> çay iste · <b>C</b> karakterin · <b>Esc</b> menü
         <span class="help-close">✕</span>
       </div>
       <div class="prompt" id="prompt"></div>
@@ -64,7 +65,7 @@ export class Hud {
     this.tensionEl = this.root.querySelector('#tension')!;
     this.warnEl = this.root.querySelector('#warn')!;
     this.root.querySelector('.help-close')!.addEventListener('click', () => (this.help.style.display = 'none'));
-    if (input.isTouch) { this.help.innerHTML = 'Sol: hareket (uzağa çek = koş) · Sağ: kamera · ✋ etkileşim · 🏏 ıstaka · 💦 çay fırlat · 😀 hareketler <span class="help-close">✕</span>'; this.help.querySelector('.help-close')!.addEventListener('click', () => (this.help.style.display = 'none')); }
+    if (input.isTouch) { this.help.innerHTML = 'Sol: hareket (uzağa çek = koş) · Sağ: kamera · ✋ etkileşim · 🏏 ıstaka · 💦 çay fırlat · 😀 hareketler · ☰ menüden karakterini düzenle <span class="help-close">✕</span>'; this.help.querySelector('.help-close')!.addEventListener('click', () => (this.help.style.display = 'none')); }
     this.mobileBtns.style.display = input.isTouch ? 'flex' : 'none';
     this.mobileBtns.querySelectorAll('button').forEach((b) => {
       const fire = (e: Event) => { e.preventDefault(); e.stopPropagation(); input.trigger((b as HTMLButtonElement).dataset.a as never); };
@@ -154,6 +155,7 @@ export class Hud {
     this.pauseEl.innerHTML = `
       <div class="panel">
         <h2>☕ Mola</h2>
+        <button class="accent" id="openCreator">👤 Karakterini düzenle</button>
         <label>Ana ses <input type="range" min="0" max="1" step="0.05" data-k="master" value="${s.master}"></label>
         <label>Efektler <input type="range" min="0" max="1" step="0.05" data-k="sfx" value="${s.sfx}"></label>
         <label>Ortam uğultusu <input type="range" min="0" max="1" step="0.05" data-k="ambience" value="${s.ambience}"></label>
@@ -193,5 +195,6 @@ export class Hud {
       });
     });
     this.pauseEl.querySelector('#resume')!.addEventListener('click', () => this.onResume());
+    this.pauseEl.querySelector('#openCreator')!.addEventListener('click', () => this.onCreator());
   }
 }

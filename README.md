@@ -22,7 +22,7 @@ npm run build    # tip kontrolü + üretim derlemesi
 ## Kontroller
 Masaüstü: WASD yürü · Shift koş · fare (tıkla = pointer lock / sürükle) kamera · tekerlek zoom · E etkileşim/otur ·
 F ıstakayla şaplak · G çay fırlat · Q hareket menüsü · 1-8 hızlı hareket (selam, kahkaha, alkış, göbek at, masaya vur, laf at, çay iç, yüzünü sil) ·
-T Şükrü'den çay iste · Esc menü / masadan kalk.
+T Şükrü'den çay iste · C karakter oluşturucu · Esc menü / masadan kalk.
 Mobil: sol yarı sanal joystick (uzağa çekince koşar), sağ yarı kamera, ✋ etkileşim, 🏏 ıstaka, 💦 çay fırlat, 😀 hareketler, 🍵 çay.
 
 ## Mimari
@@ -71,6 +71,21 @@ Klasik Okey ve 101, yukarıdan bakılan yeşil çuha bir masada oynanır (`src/u
   alabileceğin taş (soldakinin attığı) sol altta. Ortada deste, gösterge ve okey.
 - Dar ekranda yan ve karşı kenarlardaki perler küçük çizilir; o kenara dokununca büyük görünüm açılır.
   Yatay telefonda ıstaka solda, durum ve düğmeler sağda durur.
+
+## Karakter oluşturucu
+**C** tuşu ya da ☰ menü → **Karakterini düzenle**. Kamera karakterine döner; her değişiklik modeli canlı olarak yeniden kurar.
+- **Yüz:** ten rengi, kafa şekli ve büyüklüğü, burun şekli ve büyüklüğü, kaş, gözlük
+- **Saç:** saç modeli, saç/bıyık rengi, bıyık, şapka (kasket, fes, bere — aynı anda tek şapka)
+- **Beden:** boy, göbek, bacak
+- **Kıyafet:** gömlek, ceket (ya da ceketsiz), pantolon; boyun (atkı, papyon, kravat — tek parça); ekstralar (yelek, eşofman,
+  tespih, kulakta kalem, cep defteri, önlük, omuzda havlu); **hazır kıyafet**: kahvehane tiplerinden birinin kıyafeti ve bedeni,
+  yüzün ve şapkan korunur
+- **Ses:** ses inceliği (mırıltının perdesi) + deneme
+- 🎲 Rastgele, ⟲ ⟳ döndür, takma ad (en çok 16 karakter)
+
+Mantık saf modülde (`src/characters/creator.ts`): seçenek listeleri, sınırlar, rastgele karakter, şablonlar. Kayıt
+`kahvehane.character.v1` anahtarında; okunan her veri beyaz listeye ve sınırlara çekilir (bozuk ya da elle değiştirilmiş kayıt oyunu
+bozamaz) — ileride sunucudan gelecek karakterler de aynı süzgeçten geçer.
 
 ## NPC tipleri
 Her müdavim bir tipe bağlıdır. Tip; kıyafeti, yürüyüşü, oturuşu, ayakta bekleme huylarını, sesi ve davranışın

@@ -8,7 +8,8 @@ import { Kahvehane, Seat, Interactable } from '../world/Kahvehane';
 import { NavGrid } from '../world/Collision';
 import { applyOutlineVisibility } from '../world/materials';
 import { Character } from '../characters/Character';
-import { PLAYER_SPEC } from '../characters/CharacterSpec';
+import { loadPlayerSpec, savePlayerSpec, localSpecStore } from '../characters/creator';
+import { CharacterCreator } from '../ui/CharacterCreator';
 import { NPC_SPECS, PERSONALITIES } from '../npc/roster';
 import { ARCHETYPES } from '../npc/archetypes';
 import { NPC, NpcWorld } from '../npc/NPC';
@@ -111,7 +112,9 @@ export class Game {
     this.hud = new Hud(this.overlay, this.input, this.settings);
 
     // oyuncu
-    this.player = new Character(PLAYER_SPEC);
+    const saved = loadPlayerSpec(localSpecStore());
+    this.hasSavedCharacter = saved.saved;
+    this.player = new Character(saved.spec);
     this.player.bubbleHost = this.bubbles;
     this.player.pos.set(0.6, 0, 4.0);
     this.player.yaw = Math.PI;
@@ -178,6 +181,7 @@ export class Game {
       toast: (m) => this.hud.toast(m),
     });
     this.hud.onResume = () => this.togglePause(false);
+    this.hud.onCreator = () => { this.togglePause(false); this.openCreator(); };
 
     this.applySettings(this.settings);
     window.addEventListener('resize', () => this.resize());
@@ -236,6 +240,62 @@ export class Game {
     this.renderer.setAnimationLoop(() => this.tick());
   }
 
+  // ------------------------------------------------------------ karakter oluşturucu
+  hasSavedCharacter = false;
+  creator: CharacterCreator | null = null;
+
+  /** Karakter oluşturucuyu aç: kamera karakterin önüne geçer, her değişiklik modeli canlı yeniden kurar */
+  openCreator(firstTime = !this.hasSavedCharacter) {
+    if (this.creator || this.mode !== 'explore') return;
+    const p = this.player;
+    p.velocity.set(0, 0, 0);
+    p.stopWalking();
+    // karakter kameraya döner (kamera karakterin içinden geçerek önüne uçmasın)
+    p.targetYaw = null;
+    p.yaw = this.rig.yaw;
+    this.input.enabled = false;
+    this.input.releasePointer();
+    this.hud.setPrompt(null);
+    this.frameCreatorCamera();
+    this.creator = new CharacterCreator(this.overlay, p.spec, {
+      rng: this.rng,
+      preview: (spec) => this.player.setSpec(spec),
+      rotate: (d) => { p.targetYaw = null; p.yaw += d; },
+      sayTest: (spec) => { this.player.setSpec(spec); this.player.say(pickLine(['Selam ahali! Çaylar benden!', 'Bir okey dördüncüsü arıyorum!', 'Şükrü, bir tavşan kanı!', 'Hayırlı akşamlar efendim!']), 2.5); },
+      save: (spec) => {
+        this.player.setSpec(spec);
+        savePlayerSpec(localSpecStore(), spec);
+        this.hasSavedCharacter = true;
+        this.closeCreator();
+        this.hud.toast(`👤 Karakter kaydedildi${spec.name !== 'Sen' ? `: ${spec.name}` : ''}.`);
+      },
+      cancel: (orig) => { this.player.setSpec(orig); this.closeCreator(); },
+    }, firstTime);
+  }
+
+  private frameCreatorCamera() {
+    const p = this.player;
+    const front = new THREE.Vector3(Math.sin(p.yaw), 0, Math.cos(p.yaw));
+    const narrow = window.innerWidth < 760;
+    const tall = window.innerHeight > window.innerWidth;
+    const camPos = p.pos.clone().addScaledVector(front, narrow ? 3.1 : 2.6).add(new THREE.Vector3(0, 1.25, 0));
+    const look = p.pos.clone().add(new THREE.Vector3(0, tall ? 0.35 : 0.85, 0));
+    // panel sağda (geniş ekran) → karakter solda görünsün; dar ekranda panel altta → karakter üstte
+    if (!tall) {
+      const right = new THREE.Vector3().crossVectors(front.clone().negate(), new THREE.Vector3(0, 1, 0)).normalize();
+      look.addScaledVector(right, narrow ? 0.9 : 0.75);
+    }
+    this.rig.setFixed(camPos, look);
+  }
+
+  closeCreator() {
+    this.creator?.close();
+    this.creator = null;
+    this.rig.setFixed(null);
+    this.rig.yaw = this.player.yaw + Math.PI;
+    this.input.enabled = this.mode === 'explore' && !this.hud.paused;
+  }
+
   togglePause(force?: boolean) {
     const show = force ?? !this.hud.paused;
     if (show) {
@@ -244,7 +304,7 @@ export class Game {
       const wins = Object.values(this.stats.wins).reduce((a, b) => a + b, 0);
       this.hud.showPause(true, `Oynanan maç: <b>${played}</b> · Kazanılan: <b>${wins}</b> · Şaplak: <b>${this.stats.bonks}</b> · İçilen çay: <b>${this.stats.teas}</b>`);
     } else this.hud.showPause(false);
-    this.input.enabled = !show && this.mode === 'explore';
+    this.input.enabled = !show && this.mode === 'explore' && !this.creator;
   }
 
   private tick() {
@@ -257,7 +317,7 @@ export class Game {
     const paused = this.hud.paused;
     for (const a of this.input.consumeActions()) this.handleAction(a);
     if (!paused) {
-      if (this.mode === 'explore') this.updateExplore(dt);
+      if (this.mode === 'explore' && !this.creator) this.updateExplore(dt);
       else this.session?.update(dt);
       const all = [this.player, ...this.npcs.map((n) => n.c)];
       for (const n of this.npcs) n.update(dt);
@@ -281,7 +341,7 @@ export class Game {
       this.effects.update(dt);
     }
     const look = this.input.consumeLook();
-    if (this.mode === 'explore' && !paused) this.rig.look(look.dx, look.dy, look.zoom);
+    if (this.mode === 'explore' && !paused && !this.creator) this.rig.look(look.dx, look.dy, look.zoom);
     const follow = this.player.pos.clone().add(new THREE.Vector3(0, 1.25, 0));
     this.rig.update(dt, follow);
     if (this.mode === 'explore') this.fader.update(this.camera.position, follow); else this.fader.update(null, follow);
@@ -378,9 +438,10 @@ export class Game {
       this.togglePause(true);
       return;
     }
-    if (this.hud.paused || this.mode !== 'explore') return;
+    if (this.hud.paused || this.mode !== 'explore' || this.creator) return;
     sfx.unlock();
     switch (a) {
+      case 'creator': this.openCreator(); break;
       case 'interact': this.interact(); break;
       case 'bonk': if (this.social.bonk()) { this.stats.bonks++; saveStats(this.stats); } break;
       case 'tea': this.social.orderTea(); break;
