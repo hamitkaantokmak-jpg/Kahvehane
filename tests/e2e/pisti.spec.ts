@@ -59,7 +59,7 @@ test('Pişti masa görünümü: herkes kendi kenarında, aldığın kartlar seni
     s.current = 0; s.phase = 'play';
     const c = s.hands[0][0];
     const twin = { id: 9990, suit: (c.suit + 1) % 4, rank: c.rank };
-    s.pile = [twin]; s.hiddenCount = 0; ui.refresh(); return c.id;`);
+    s.pile = [twin]; s.hiddenCount = 0; s.captured = [[], []]; s.pistis = [0, 0]; ui.refresh(); return c.id;`);
   await expect(page.locator('.pseat.bottom .pcap .pl')).toContainText('0 kart');
   await page.locator(`.phand .card[data-id="${mine}"]`).click();
   await expect(page.locator('.pseat.bottom .pcap .pl')).toContainText('2 kart');
