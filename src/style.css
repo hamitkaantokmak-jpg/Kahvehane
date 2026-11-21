@@ -209,13 +209,39 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
   .ozone:not(.bottom) .meld .tile.small .num { font-size: 10px; }
   .ozone:not(.bottom) .meld .tile.small .dot { display: none; }
   .ozone:not(.bottom) .meld .tile.joker::after { font-size: 9px; top: -6px; right: -4px; }
+  .game-root .gui.pisti { padding-top: 54px; gap: 4px; }
+  .game-root .gui.tavla { padding-top: 54px; gap: 4px; }
+  .gui .ttable { border-width: 5px; border-radius: 18px; padding: 4px 6px; gap: 3px; --rowh: max(60px, calc(50vh - 120px)); }
+  .gui .tmid { height: 26px; }
+  .gui .die { font-size: 26px; }
+  .gui .tside { width: 40px; padding: 4px 2px; }
+  .gui .offstack i { width: 24px; }
+  .gui .tplate .tscore { font-size: 10px; }
+  .gui .ptable { border-width: 5px; border-radius: 18px; padding: 4px; gap: 3px; }
+  .gui .pinfo { font-size: 10px; padding: 2px 6px; }
+  .gui .pside .nm { max-width: 90px; }
+  .gui .pside .tot { font-size: 12px; }
+  .gui .pcenter { gap: 10px; padding: 3px 8px; }
+  .gui .pile-center { width: 64px; height: 80px; }
+  .gui .pile-center .pcount { bottom: -16px; font-size: 10px; }
+  .gui .pdeck .card { width: 40px; height: 58px; }
+  .gui .pdeck .card .cs { font-size: 18px; }
+  .gui .pseat { padding: 2px; gap: 2px; }
+  .gui .pseat .backs .card.small { width: 20px; height: 29px; margin-left: -12px; }
+  .gui .pcap .card.small { width: 22px; height: 32px; }
+  .gui .phand { min-height: 0; }
   .game-root .throw-btn, .game-root .objection-btn { top: 12px; padding: 4px 8px; }
   .game-root .throw-btn { left: 182px; } .game-root .objection-btn { left: 226px; }
   .throw-btn .lb, .objection-btn .lb { display: none; }
   .game-root .throw-pick { top: 52px; left: 182px; }
 }
-/* yatay telefon: ıstaka solda, durum + düğmeler sağda → masaya yer kalır */
+/* yatay telefon: ıstaka/el solda, durum + düğmeler sağda → masaya yer kalır */
 @media (max-height: 520px) and (min-width: 600px) {
+  .gui .phand .card { width: 44px; height: 63px; }
+  .gui .phand .card .cs { font-size: 19px; }
+  .gui .phand .card .cr { font-size: 11px; }
+  .gui .phand { gap: 5px; }
+  .gui .pcap .pl { font-size: 9px; }
   .odock { flex-direction: row; align-items: stretch; width: 98vw; gap: 6px; }
   .oside { display: flex; flex-direction: column; justify-content: center; gap: 4px; flex: 1; min-width: 0; }
   .oside .status { font-size: 11px; padding: 2px 6px; line-height: 1.25; max-width: none; }
@@ -224,6 +250,13 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
   .oside .gbtns button { padding: 4px 8px; font-size: 12px; }
 }
 @media (max-width: 520px) {
+  .game-root .gui.pisti { padding-top: 104px; }
+  .game-root .gui.tavla { padding-top: 104px; }
+  .gui .ttable { --rowh: min(150px, calc(50vh - 200px)); }
+  .gui .tboard { width: calc(96vw - 70px); }
+  .gui .ptable { grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: auto auto minmax(min-content, 1fr) auto;
+    grid-template-areas: "sc sc sc" "top top top" "left ctr right" "bot bot bot"; }
+  .gui .pinfo { justify-self: stretch; }
   .gui.okey { padding-top: 104px; }
   .ozone.left .oplate, .ozone.right .oplate { flex-wrap: wrap; white-space: normal; justify-content: center; row-gap: 0; }
   .oplate .nm { min-width: 3.5em; }
@@ -233,9 +266,37 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
 }
 
 /* tavla */
-.twrap { display: flex; gap: 8px; align-items: stretch; max-width: 98vw; }
-.tboard { background: #6b3a1c; border: 4px solid var(--ink); border-radius: 14px; padding: 8px; display: flex; flex-direction: column; gap: 10px; width: min(640px, 76vw); }
-.trow { display: flex; gap: 6px; height: min(190px, 26vh); }
+/* ------------------------------------------------ tavla masası (masaya odaklı görünüm) */
+.gui.tavla { padding-top: 150px; }
+.ttable { --rowh: min(170px, calc(50vh - 190px)); display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 8px 12px; max-width: 98vw;
+  background: radial-gradient(ellipse at 50% 45%, #3fae64 0%, #26814e 60%, #1c6440 100%);
+  border: 8px solid #8a5228; outline: 3px solid var(--ink); border-radius: 26px;
+  box-shadow: inset 0 0 0 2px #c98a4b, inset 0 0 34px rgba(0,0,0,.35), 0 7px 0 #4d2a10; }
+.tplate { display: flex; align-items: center; gap: 10px; }
+.tplate .tscore { color: var(--paper); font-size: 12px; opacity: .9; }
+.chk-dot { width: 12px; height: 12px; border-radius: 50%; border: 2px solid var(--ink); display: inline-block; }
+.chk-dot.w { background: #fffaf0; } .chk-dot.b { background: #2b2b2b; }
+.twrap { display: flex; gap: 6px; align-items: stretch; max-width: 100%; }
+.tboard { background: #6b3a1c; border: 4px solid var(--ink); border-radius: 14px; padding: 6px; display: flex; flex-direction: column; gap: 0; width: min(640px, 76vw); box-shadow: 0 5px 0 #3d2010; }
+.trow { display: flex; gap: 6px; height: var(--rowh); min-height: 70px; }
+.tmid { height: 40px; display: flex; align-items: center; justify-content: flex-end; padding: 0 12%; }
+.tmid.opp { justify-content: flex-start; }
+.dice { display: flex; gap: 6px; justify-content: center; align-items: center; flex-wrap: nowrap; }
+.dice .muted { color: var(--paper); font-size: 12px; opacity: .7; }
+.die { font-size: 38px; line-height: 1; color: #fff; text-shadow: 0 2px 0 var(--ink); }
+.chk { --cs: min(34px, 4.6vw, calc(var(--rowh) / 5.6)); width: var(--cs); height: var(--cs); border-radius: 50%; border: 2px solid var(--ink); margin: -1px 0; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: calc(var(--cs) * .4); box-shadow: inset 0 -3px 0 rgba(0,0,0,.25); flex: 0 0 auto; }
+.tside { display: flex; flex-direction: column; justify-content: space-between; align-items: center; gap: 4px; width: 54px; background: #6b3a1c; border: 4px solid var(--ink); border-radius: 14px; padding: 6px 4px; box-shadow: 0 5px 0 #3d2010; }
+.tlabel { font-size: 9px; color: var(--paper); font-weight: 800; opacity: .8; writing-mode: vertical-rl; transform: rotate(180deg); }
+.off { display: flex; flex-direction: column; align-items: center; gap: 3px; border-radius: 8px; padding: 3px; background: #4d2a10; }
+.off.w { flex-direction: column; }
+.off .cnt { color: var(--paper); font-size: 11px; text-align: center; line-height: 1.1; }
+.off .cnt small { display: block; color: #9ff0b4; font-weight: 800; }
+.off.tgt { background: #2f8f4e; cursor: pointer; animation: glow 1s infinite; }
+.offstack { display: flex; flex-direction: column; gap: 1px; }
+.off.w .offstack { flex-direction: column-reverse; }
+.offstack i { width: 30px; height: calc(min(5px, var(--rowh) / 30)); border-radius: 2px; border: 1px solid rgba(255, 243, 214, .15); }
+.offstack i.w { background: #fffaf0; border-color: var(--ink); }
+.offstack i.b { background: #2b2b2b; border-color: #000; }
 .thalf { flex: 1; display: flex; background: #e9c891; border-radius: 6px; padding: 0 2px; }
 .pt { flex: 1; position: relative; display: flex; flex-direction: column; align-items: center; cursor: pointer; }
 .pt .tri { position: absolute; left: 4%; right: 4%; top: 0; bottom: 18%; clip-path: polygon(0 0, 100% 0, 50% 100%); }
@@ -248,7 +309,6 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
 .pt .pnum { position: absolute; bottom: -2px; font-size: 9px; color: #6b3a1c; font-weight: 800; z-index: 2; }
 .pt.top .pnum { bottom: auto; top: auto; bottom: 0; }
 .pt.bot .pnum { top: 0; bottom: auto; }
-.chk { width: min(34px, 4.6vw); height: min(34px, 4.6vw); border-radius: 50%; border: 2px solid var(--ink); margin: -2px 0; display: flex; align-items: center; justify-content: center; font-weight: 900; font-size: 12px; box-shadow: inset 0 -3px 0 rgba(0,0,0,.25); }
 .chk.w { background: #fffaf0; }
 .chk.b { background: #2b2b2b; color: #fff; }
 .pt.src .stack .chk:last-child, .pt.bot.src .stack .chk:last-child { box-shadow: 0 0 0 3px var(--gold); }
@@ -256,32 +316,48 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
 .pt.tgt::after { content: ""; position: absolute; inset: 0 8%; border-radius: 8px; background: rgba(90, 209, 122, .45); box-shadow: 0 0 0 3px #5ad17a; animation: glow 1s infinite; z-index: 3; }
 .bar { width: 40px; background: #4d2a10; border-radius: 6px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; }
 .bar.src .chk { box-shadow: 0 0 0 3px var(--gold); cursor: pointer; }
-.tside { display: flex; flex-direction: column; gap: 8px; justify-content: space-between; width: min(150px, 20vw); }
-.off { background: var(--paper); border: 3px solid var(--ink); border-radius: 12px; padding: 6px; text-align: center; font-size: 13px; display: flex; flex-direction: column; }
-.off.tgt { background: #8ee6a4; cursor: pointer; animation: glow 1s infinite; }
-.dice { display: flex; gap: 4px; justify-content: center; align-items: center; min-height: 52px; flex-wrap: wrap; }
-.die { font-size: 46px; line-height: 1; color: #fff; text-shadow: 0 2px 0 var(--ink); }
 .die.used { opacity: .3; }
 .die.rolling { animation: spin .15s infinite linear; display: inline-block; }
 @keyframes spin { to { transform: rotate(360deg); } }
-.tscore { background: var(--paper); border: 3px solid var(--ink); border-radius: 12px; padding: 6px; font-size: 13px; text-align: center; }
 
 /* pişti */
-.pinfo { display: flex; gap: 8px; flex-wrap: wrap; justify-content: center; }
-.pside, .pdeck { background: var(--paper); border: 3px solid var(--ink); border-radius: 12px; padding: 4px 10px; font-size: 12px; }
-.pside.me { background: #d9f5df; }
-.pside .nm { font-weight: 800; font-size: 14px; }
-.ptable { position: relative; width: min(640px, 96vw); height: min(250px, 34vh); background: radial-gradient(ellipse at center, #3a85d0, #1f5a9a); border: 4px solid var(--ink); border-radius: 50%/40%; }
-.popp { position: absolute; display: flex; flex-direction: column; align-items: center; gap: 2px; }
-.popp .nm { background: var(--paper); border: 2px solid var(--ink); border-radius: 8px; padding: 0 8px; font-weight: 800; font-size: 12px; }
-.popp.turn .nm { background: var(--gold); animation: glow 1.2s infinite; }
-.popp.partner .nm { background: #d9f5df; }
-.popp.top { top: 6px; left: 50%; transform: translateX(-50%); }
-.popp.left { left: 10px; top: 50%; transform: translateY(-50%); }
-.popp.right { right: 10px; top: 50%; transform: translateY(-50%); }
 .backs { display: flex; }
 .backs .card { margin-left: -14px; }
-.pile-center { position: absolute; left: 50%; top: 55%; transform: translate(-50%, -50%); width: 90px; height: 120px; display: flex; align-items: center; justify-content: center; }
+/* ------------------------------------------------ pişti masası (masaya odaklı görünüm) */
+.gui.pisti { padding-top: 150px; }
+.ptable { position: relative; flex: 1 1 auto; min-height: 0; max-height: 420px; width: min(980px, 98vw); display: grid; gap: 6px; padding: 10px;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr); grid-template-rows: auto minmax(min-content, 1fr) auto;
+  grid-template-areas: "sc top ." "left ctr right" ". bot .";
+  background: radial-gradient(ellipse at 50% 45%, #3fae64 0%, #26814e 60%, #1c6440 100%);
+  border: 8px solid #8a5228; outline: 3px solid var(--ink); border-radius: 26px;
+  box-shadow: inset 0 0 0 2px #c98a4b, inset 0 0 34px rgba(0,0,0,.35), 0 7px 0 #4d2a10; }
+.pinfo { grid-area: sc; align-self: start; justify-self: start; display: flex; flex-direction: column; gap: 2px; background: rgba(20, 12, 6, .55); border: 2px solid rgba(255, 243, 214, .4); border-radius: 10px; padding: 4px 8px; color: var(--paper); font-size: 12px; }
+.pside { display: flex; align-items: baseline; gap: 6px; white-space: nowrap; }
+.pside .nm { font-weight: 700; max-width: 150px; overflow: hidden; text-overflow: ellipsis; }
+.pside .tot { font-size: 15px; color: #fff; margin-left: auto; }
+.pside .of { opacity: .7; font-size: 11px; }
+.pside.me .nm { color: #9ff0b4; }
+.pel { font-size: 10px; opacity: .75; }
+.pseat { display: flex; flex-direction: column; align-items: center; gap: 4px; min-width: 0; border-radius: 14px; padding: 4px; transition: background .3s; }
+.pseat.top, .pseat.bottom { flex-direction: row; align-items: center; gap: 14px; }
+.pwho { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.odock .phand { order: 1; }
+.pseat.top { grid-area: top; }
+.pseat.left { grid-area: left; justify-self: start; align-self: center; }
+.pseat.right { grid-area: right; justify-self: end; align-self: center; }
+.pseat.bottom { grid-area: bot; justify-content: center; }
+.pseat.turn { background: rgba(242, 177, 52, .16); box-shadow: inset 0 0 0 2px rgba(242, 177, 52, .7); }
+.pcenter { grid-area: ctr; align-self: center; display: flex; align-items: center; gap: 22px; padding: 8px 16px; background: rgba(0, 0, 0, .14); border-radius: 18px; }
+.pdeck { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.pdeck .card { box-shadow: 2px 2px 0 #7a2318, 4px 4px 0 #5e1b12, 0 5px 0 rgba(0,0,0,.4); }
+.pdeck .empty, .pcap .empty { width: 32px; height: 46px; border: 2px dashed rgba(255, 243, 214, .45); border-radius: 6px; }
+.pdeck .pl, .pcap .pl { font-size: 10px; color: var(--paper); font-weight: 700; white-space: nowrap; }
+.pcap .pl b { color: var(--gold); }
+.pcap { display: flex; flex-direction: column; align-items: center; gap: 2px; }
+.pcap-stack { position: relative; display: grid; }
+.pcap-stack > * { grid-area: 1 / 1; transform: translate(calc(var(--i, 0) * 2px), calc(var(--i, 0) * -2px)) rotate(calc(var(--i, 0) * 4deg - 6deg)); }
+.pcap.fresh .pcap-stack { animation: pop .35s; }
+.pile-center { position: relative; width: 90px; height: 120px; display: flex; align-items: center; justify-content: center; }
 .pile-center .card { position: absolute; }
 .pile-center .pcount { position: absolute; bottom: -22px; color: #fff; font-weight: 700; font-size: 12px; white-space: nowrap; }
 .pile-center .empty { color: var(--paper); font-weight: 800; text-align: center; }
@@ -323,8 +399,6 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
   .mobile-btns { bottom: 12px; right: 10px; }
 }
 @media (max-height: 520px) {
-  .trow { height: 30vh; }
-  .ptable { height: 28vh; }
 }
 @media (max-width: 520px) {
   .rack .slot { width: min(27px, calc((96vw - 34px) / 16)); height: auto; aspect-ratio: .68; }

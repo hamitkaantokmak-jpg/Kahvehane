@@ -65,3 +65,19 @@ test('Tavla: baştan sona tam oyun (bot rakibe karşı)', async ({ page }) => {
   expect(st.score[0] + st.score[1]).toBeGreaterThan(0);
   expect(errs).toEqual([]);
 });
+
+test('Tavla masa görünümü: rakip karşıda, sen altta; zarlar tahtanın ortasında, toplanan pullar yanda', async ({ page }) => {
+  const errs = trackErrors(page);
+  await boot(page);
+  await openGame(page, 'tavla');
+  await expect(page.locator('.tplate.opp .oplate')).toBeVisible();
+  await expect(page.locator('.tplate.me .oplate')).toContainText('Sen');
+  await withUI(page, `s.phase = 'roll'; s.current = 0; s.openingRolls = [6, 1]; ui.forceDice = [6, 5]; ui.refresh();`);
+  await page.locator('.gbtns button:has-text("Zar at")').click();
+  await expect(page.locator('.tboard .tmid .dice .die')).toHaveCount(2);
+  await expect(page.locator('.tplate.me .oplate.turn')).toBeVisible();
+  await withUI(page, `s.off = [7, 3]; ui.refresh();`);
+  await expect(page.locator('.tside .off.w .offstack i.w')).toHaveCount(7);
+  await expect(page.locator('.tside .off.b .offstack i.b')).toHaveCount(3);
+  expect(errs).toEqual([]);
+});

@@ -17,6 +17,9 @@ export class TavlaUI implements GameUI {
   private undoStack: string[] = [];
   private boardEl!: HTMLDivElement;
   private side!: HTMLDivElement;
+  private oppPlate!: HTMLDivElement;
+  private myPlate!: HTMLDivElement;
+  private diceEl!: HTMLDivElement;
   private status!: HTMLDivElement;
   private btns!: HTMLDivElement;
   private rolling = false;
@@ -27,13 +30,23 @@ export class TavlaUI implements GameUI {
   constructor(private host: GameHost, opts: V.TavlaOptions) {
     this.el = h('div', 'gui tavla');
     this.s = V.newTavla(opts);
+    // masa: karşıda rakip, altta sen; tahtanın sağında toplama kutuları, zarlar tahtanın ortasında
     this.boardEl = h('div', 'tboard');
     this.side = h('div', 'tside');
+    this.diceEl = h('div', 'dice');
+    this.oppPlate = h('div', 'tplate opp');
+    this.myPlate = h('div', 'tplate me');
     this.status = h('div', 'status');
     this.btns = h('div', 'gbtns');
     const wrap = h('div', 'twrap');
     wrap.append(this.boardEl, this.side);
-    this.el.append(wrap, this.status, this.btns);
+    const table = h('div', 'ttable');
+    table.append(this.oppPlate, wrap, this.myPlate);
+    const dock = h('div', 'odock');
+    const side = h('div', 'oside');
+    side.append(this.status, this.btns);
+    dock.append(side);
+    this.el.append(table, dock);
     this.render();
   }
 
@@ -73,7 +86,7 @@ export class TavlaUI implements GameUI {
     // zar animasyonu
     let k = 0;
     const anim = () => {
-      const d = this.side.querySelector('.dice');
+      const d = this.diceEl;
       if (d) d.innerHTML = `<span class="die rolling">${PIPS[1 + Math.floor(Math.random() * 6)]}</span><span class="die rolling">${PIPS[1 + Math.floor(Math.random() * 6)]}</span>`;
       if (++k < 6) this.timer = later(anim, 70);
       else {
@@ -212,22 +225,44 @@ export class TavlaUI implements GameUI {
     barBot.addEventListener('click', () => this.clickSource('bar'));
     bot.appendChild(barBot);
     half(bot, [5, 4, 3, 2, 1, 0], false);
-    this.boardEl.append(top, bot);
+    // orta şerit: zarlar
+    const mid = h('div', `tmid${s.current === 1 ? ' opp' : ''}`);
+    const dice = this.diceEl;
+    dice.innerHTML = '';
+    mid.appendChild(dice);
+    this.boardEl.append(top, mid, bot);
 
-    // yan panel: toplanan pullar, zarlar, skor
+    // tahtanın yanı: toplanan pullar (üstte rakibin, altta senin)
     this.side.innerHTML = '';
-    const offB = h('div', 'off b', `<span>${this.host.names[1]}</span><b>${s.off[1]}</b>/15`);
-    const dice = h('div', 'dice');
+    const offStack = (n: number, color: 'w' | 'b') => {
+      const st = h('div', 'offstack');
+      for (let k = 0; k < 15; k++) st.appendChild(h('i', k < n ? color : ''));
+      return st;
+    };
+    const offB = h('div', 'off b');
+    offB.append(offStack(s.off[1], 'b'), h('div', 'cnt', `<b>${s.off[1]}</b>/15`));
     if (s.phase === 'opening' && s.openingRolls === null) dice.innerHTML = '<span class="muted">Açılış zarı</span>';
     else if (s.dice.length) {
       const used = [...s.remaining];
       const all = s.dice[0] === s.dice[1] ? [s.dice[0], s.dice[0], s.dice[0], s.dice[0]] : s.dice;
       dice.innerHTML = all.map((d) => { const i = used.indexOf(d); if (i >= 0) { used.splice(i, 1); return `<span class="die">${PIPS[d]}</span>`; } return `<span class="die used">${PIPS[d]}</span>`; }).join('');
     }
-    const offW = h('div', `off w${targets.has('off') ? ' tgt' : ''}`, `<span>Sen</span><b>${s.off[0]}</b>/15<small>${targets.has('off') ? 'Topla ⬇' : ''}</small>`);
+    const offW = h('div', `off w${targets.has('off') ? ' tgt' : ''}`);
+    offW.append(h('div', 'cnt', `<b>${s.off[0]}</b>/15${targets.has('off') ? '<small>Topla</small>' : ''}`), offStack(s.off[0], 'w'));
     offW.addEventListener('click', () => targets.has('off') && this.clickTarget('off'));
-    const score = h('div', 'tscore', `Maç (${s.options.target}): <b>${s.score[0]}</b> – <b>${s.score[1]}</b><br><small>Pip: ${V.pipCount(s, 0)} / ${V.pipCount(s, 1)}</small>`);
-    this.side.append(offB, dice, offW, score);
+    this.side.append(offB, h('div', 'tlabel', 'Toplanan'), offW);
+    // oyuncu plakaları: ad, pip, maç skoru
+    const live = s.phase === 'roll' || s.phase === 'move';
+    const plate = (el: HTMLDivElement, p: V.Player) => {
+      el.className = `tplate ${p === 0 ? 'me' : 'opp'}`;
+      el.innerHTML = '';
+      const o = h('div', `oplate${live && s.current === p ? ' turn' : ''}`);
+      o.innerHTML = `<span class="chk-dot ${p === 0 ? 'w' : 'b'}"></span><span class="nm">${p === 0 ? 'Sen' : this.host.names[1]}</span><span class="meta">pip ${V.pipCount(s, p)}</span><span class="cnt" title="Maç skoru">${s.score[p]}</span>`;
+      el.appendChild(o);
+      if (p === 0) el.appendChild(h('div', 'tscore', `Maç ${s.options.target} puan: <b>${s.score[0]}</b> – <b>${s.score[1]}</b>`));
+    };
+    plate(this.oppPlate, 1);
+    plate(this.myPlate, 0);
 
     let msg = '';
     if (s.phase === 'opening') msg = '🎲 Açılış: büyük atan başlar.';

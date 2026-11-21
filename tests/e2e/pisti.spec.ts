@@ -47,3 +47,23 @@ for (const players of [2, 4] as const) {
     expect(errs).toEqual([]);
   });
 }
+
+test('Pişti masa görünümü: herkes kendi kenarında, aldığın kartlar senin önünde yığılır', async ({ page }) => {
+  const errs = trackErrors(page);
+  await boot(page);
+  await openGame(page, 'pisti4');
+  for (const z of ['top', 'left', 'right', 'bottom']) await expect(page.locator(`.ptable .pseat.${z}`)).toBeVisible();
+  await expect(page.locator('.pseat.top .oplate')).toContainText('ortak');
+  // yerde aynı değerli tek kart + elimde eşi → alırsın (pişti), yığın senin önünde büyür
+  const mine = await withUI<number>(page, `
+    s.current = 0; s.phase = 'play';
+    const c = s.hands[0][0];
+    const twin = { id: 9990, suit: (c.suit + 1) % 4, rank: c.rank };
+    s.pile = [twin]; s.hiddenCount = 0; ui.refresh(); return c.id;`);
+  await expect(page.locator('.pseat.bottom .pcap .pl')).toContainText('0 kart');
+  await page.locator(`.phand .card[data-id="${mine}"]`).click();
+  await expect(page.locator('.pseat.bottom .pcap .pl')).toContainText('2 kart');
+  await expect(page.locator('.pseat.bottom .pcap .pl')).toContainText('pişti');
+  await expect(page.locator('.pinfo .pside.me')).toBeVisible();
+  expect(errs).toEqual([]);
+});
