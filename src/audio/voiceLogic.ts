@@ -3,6 +3,7 @@
  * Metinden hece dizisi üretir: her ünlü grubu bir "hece"; ünlü türü metindeki harfe göre (Türkçe ünlüler),
  * tonlama: soru (?) sonda yükselir, ünlem (!) daha yüksek ve hızlı.
  */
+import { NPC_VOICES } from '../npc/roster';
 import type { Rng } from '../games/common/rng';
 
 export type Vowel = 'a' | 'e' | 'i' | 'o' | 'u';
@@ -20,15 +21,9 @@ export interface VoiceProfile {
   gain: number;
 }
 
-/** Her NPC'nin kendine özgü sesi */
+/** Her NPC'nin kendine özgü sesi (tanımlar npc/roster.ts'de) */
 export const VOICES: Record<string, VoiceProfile> = {
-  riza: { base: 105, rate: 6, range: 0.25, timbre: 'sawtooth', gain: 1 }, // kalın, ağır, homurtulu
-  cemal: { base: 135, rate: 9, range: 0.35, timbre: 'square', gain: 0.9 }, // hızlı, iddialı
-  nihat: { base: 190, rate: 10, range: 0.5, timbre: 'triangle', gain: 0.9 }, // ince, kıkırdak
-  sukru: { base: 165, rate: 11, range: 0.4, timbre: 'triangle', gain: 0.85 }, // çok konuşan, hızlı
-  hasan: { base: 95, rate: 4, range: 0.15, timbre: 'sawtooth', gain: 0.7 }, // uykulu, yavaş
-  ferhat: { base: 150, rate: 9.5, range: 0.55, timbre: 'square', gain: 1 }, // coşkulu
-  kemal: { base: 120, rate: 6.5, range: 0.2, timbre: 'sawtooth', gain: 0.9 }, // resmi, tekdüze
+  ...NPC_VOICES,
   player: { base: 140, rate: 8, range: 0.35, timbre: 'triangle', gain: 0.8 },
 };
 

@@ -8,9 +8,11 @@ import { Kahvehane, Seat, Interactable } from '../world/Kahvehane';
 import { NavGrid } from '../world/Collision';
 import { applyOutlineVisibility } from '../world/materials';
 import { Character } from '../characters/Character';
-import { PLAYER_SPEC, NPC_SPECS } from '../characters/CharacterSpec';
+import { PLAYER_SPEC } from '../characters/CharacterSpec';
+import { NPC_SPECS, PERSONALITIES } from '../npc/roster';
+import { ARCHETYPES } from '../npc/archetypes';
 import { NPC, NpcWorld } from '../npc/NPC';
-import { PERSONALITIES, pickLine, SUKRU_LINES } from '../npc/personalities';
+import { pickLine, SUKRU_LINES } from '../npc/personalities';
 import { Effects } from '../fx/Effects';
 import { Bubbles } from '../ui/Bubbles';
 import { Hud } from '../ui/Hud';
@@ -446,7 +448,8 @@ export class Game {
       case 'npc': {
         const n = it.ref as NPC;
         if (n.id === 'sukru' && this.economy.debt > 0 && this.economy.balance > 0) return `Şükrü'ye borcunu öde (${this.economy.debt}🪙)`;
-        return n.mode === 'sleep' ? `${n.c.name}'ı dürt` : `${n.c.name} ile konuş · F: ıstaka`;
+        const type = ARCHETYPES[n.p.archetype].label.toLocaleLowerCase('tr');
+        return n.mode === 'sleep' ? `${n.c.name}'ı dürt (${type})` : `${n.c.name} (${type}) ile konuş · F: ıstaka`;
       }
       default: return it.label;
     }

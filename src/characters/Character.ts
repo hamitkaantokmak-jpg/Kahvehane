@@ -68,10 +68,11 @@ export class Character {
   }
 
   /** Yol bulma ile hedefe yürü. */
-  walkTo(nav: NavGrid, x: number, z: number, onArrive?: () => void, speed = 1.3) {
+  walkTo(nav: NavGrid, x: number, z: number, onArrive?: () => void, speed?: number) {
     this.path = nav.findPath(this.pos.x, this.pos.z, x, z);
     this.onArrive = onArrive ?? null;
-    this.moveSpeed = speed;
+    // hız verilmezse tipin yürüyüş hızı (emekli ağır, delikanlı hızlı)
+    this.moveSpeed = speed ?? this.anim.gait.speed;
   }
 
   stopWalking() {

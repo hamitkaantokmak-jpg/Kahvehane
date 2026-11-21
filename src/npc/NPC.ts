@@ -154,7 +154,7 @@ export class NPC {
       const x = -7 + Math.random() * 14, z = -5.5 + Math.random() * 11;
       if (!this.w.kahve.collision.blocked(x, z, 0.4)) {
         this.mode = 'walking';
-        c.walkTo(nav, x, z, () => { this.mode = 'wander'; this.timer = 2 + Math.random() * 3; c.anim.play(Math.random() < 0.5 ? 'shrug' : 'think'); }, 1.0 + Math.random() * 0.4);
+        c.walkTo(nav, x, z, () => { this.mode = 'wander'; this.timer = 2 + Math.random() * 3; c.anim.play(Math.random() < 0.5 ? 'shrug' : 'think'); }, c.anim.gait.speed * (0.77 + Math.random() * 0.3));
         return;
       }
     }

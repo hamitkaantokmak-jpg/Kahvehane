@@ -1,9 +1,10 @@
 import { describe, it, expect, vi, afterEach } from 'vitest';
 import * as THREE from 'three';
 import { Character } from '../src/characters/Character';
-import { NPC_SPECS, PLAYER_SPEC } from '../src/characters/CharacterSpec';
+import { PLAYER_SPEC } from '../src/characters/CharacterSpec';
+import { NPC_SPECS } from '../src/npc/roster';
 import { NPC, NpcWorld } from '../src/npc/NPC';
-import { PERSONALITIES } from '../src/npc/personalities';
+import { PERSONALITIES } from '../src/npc/roster';
 import { BrawlController } from '../src/npc/BrawlController';
 import { ChaosDirector } from '../src/chaos/ChaosDirector';
 import { createRng } from '../src/games/common/rng';

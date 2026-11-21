@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import * as V from '../src/audio/voiceLogic';
 import { createRng } from '../src/games/common/rng';
-import { NPC_SPECS } from '../src/characters/CharacterSpec';
+import { NPC_SPECS } from '../src/npc/roster';
 
 describe('NPC mırıltısı mantığı', () => {
   it('her NPC kendine özgü ses profiline sahip', () => {

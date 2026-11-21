@@ -105,6 +105,47 @@ export class CharacterModel {
       this.handPropL.add(beads);
     }
 
+    // göbek yüzeyi: (x, y) noktasında önden z (aksesuarları göbeğin üstüne oturtmak için)
+    const bRx = bellyR, bRy = torsoH * 0.55, bRz = bellyR * (0.95 + s.belly * 0.25), bCy = 0.2, bCz = 0.02 + s.belly * 0.05;
+    const bellyZ = (x: number, y: number) => {
+      const k = 1 - (x / bRx) ** 2 - ((y - bCy) / bRy) ** 2;
+      const onBelly = k > 0 ? bCz + bRz * Math.sqrt(k) : 0;
+      return Math.max(onBelly, 0.15); // göğüs önü
+    };
+    if (s.accessories.includes('tie')) {
+      // kravat: yakada düğüm, göbeğin üstünden sarkan uç (yüzeyi izleyen 4 parça)
+      const red = 0x8e1b2a;
+      this.spine.add(part(SPH(10), red, [0.04, 0.035, 0.03], [0, torsoH * 0.86, bellyZ(0, torsoH * 0.86) + 0.01], 0.006));
+      const ys = [0.8, 0.68, 0.56, 0.44, 0.33].map((f) => torsoH * f);
+      for (let i = 0; i < ys.length - 1; i++) {
+        const y0 = ys[i], y1 = ys[i + 1];
+        const z0 = bellyZ(0, y0) + 0.012, z1 = bellyZ(0, y1) + 0.012;
+        const seg = part(BOX(), red, [0.05 + i * 0.012, Math.hypot(y0 - y1, z1 - z0) + 0.01, 0.015], [0, (y0 + y1) / 2, (z0 + z1) / 2], 0.006);
+        seg.rotation.x = -Math.atan2(z1 - z0, y0 - y1);
+        this.spine.add(seg);
+      }
+    }
+    if (s.accessories.includes('pocket')) {
+      // gömlek cebi + içinde not defteri (sol göğüs)
+      const shade = new THREE.Color(s.shirt).multiplyScalar(0.62).getHex();
+      const py = torsoH * 0.68, px = 0.11;
+      const pz = bellyZ(px, py);
+      this.spine.add(part(BOX(), shade, [0.11, 0.1, 0.025], [px, py, pz], 0.007).rotateY(0.3));
+      this.spine.add(part(BOX(), 0xfaf3dc, [0.07, 0.075, 0.018], [px - 0.01, py + 0.055, pz - 0.006], 0.005).rotateY(0.3));
+      this.spine.add(part(CYL(), 0x1d5fc4, [0.01, 0.09, 0.01], [px + 0.03, py + 0.1, pz - 0.004], 0.003));
+    }
+    if (s.accessories.includes('tracksuit')) {
+      // eşofman fermuarı (göğüsten göbeğe)
+      for (const f of [0.85, 0.7, 0.55, 0.4]) this.spine.add(part(BOX(), 0xffffff, [0.012, torsoH * 0.16, 0.01], [0, torsoH * f, bellyZ(0, torsoH * f) + 0.004], 0));
+    }
+    if (s.accessories.includes('towel')) {
+      // omuzda havlu (sol omuz)
+      const towel = part(BOX(), 0xfdfdfd, [0.12, 0.05, 0.3], [chestW + 0.04, torsoH * 0.9, 0], 0.008);
+      towel.rotation.z = -0.35;
+      this.spine.add(towel);
+      for (const z of [0.15, -0.15]) this.spine.add(part(BOX(), 0x4f8bd6, [0.13, 0.055, 0.02], [chestW + 0.04, torsoH * 0.9, z], 0).rotateZ(-0.35));
+    }
+
     // --- boyun & kafa ---
     this.neck.position.y = torsoH * 0.95;
     this.spine.add(this.neck);
@@ -226,6 +267,17 @@ export class CharacterModel {
       this.hat.add(part(CYL(), 0xc0392b, [hr * 0.5, hr * 0.03, hr * 0.5], [0, -hr * 0.02, hr * 0.75], 0.01));
     }
 
+    if (s.accessories.includes('pencil')) {
+      // kulağın arkasında kalem
+      const pen = new THREE.Group();
+      pen.position.set(-hr * hs[0] * 1.08, hr * 0.32, -hr * 0.05);
+      pen.rotation.set(Math.PI / 2 - 0.35, 0, 0.15); // kulağın üstünde, önden arkaya yatık
+      pen.add(part(CYL(), 0xf2c230, [0.017, 0.22, 0.017], [0, 0.11, 0], 0.005));
+      pen.add(part(CONE(), 0xe8c79a, [0.017, 0.04, 0.017], [0, -0.13, 0], 0.004).rotateX(Math.PI));
+      pen.add(part(CYL(), 0xe86a8a, [0.018, 0.03, 0.018], [0, 0.14, 0], 0.004));
+      this.head.add(pen);
+    }
+
     // --- kollar ---
     const shoulderY = torsoH * 0.82;
     const armLen = 0.24 * s.armLength;
@@ -235,10 +287,13 @@ export class CharacterModel {
       this.spine.add(upper);
       upper.add(part(SPH(12), jacket, [0.085, 0.085, 0.085], [0, 0, 0]));
       upper.add(part(CAP(), jacket, [0.06, armLen, 0.06], [0, -0.02, 0]));
+      if (s.accessories.includes('tracksuit')) upper.add(part(BOX(), 0xffffff, [0.012, armLen * 1.1, 0.025], [sx * 0.058, -0.02 - armLen * 0.5, 0], 0));
       const lower = new THREE.Group();
       lower.position.y = -armLen - 0.04;
       upper.add(lower);
-      lower.add(part(CAP(), s.jacket ? jacket : s.skin, [0.052, armLen * 0.9, 0.052], [0, 0, 0]));
+      const sleeve = s.jacket || s.accessories.includes('tracksuit');
+      lower.add(part(CAP(), sleeve ? jacket : s.skin, [0.052, armLen * 0.9, 0.052], [0, 0, 0]));
+      if (s.accessories.includes('tracksuit')) lower.add(part(BOX(), 0xffffff, [0.012, armLen, 0.022], [sx * 0.05, -armLen * 0.45, 0], 0));
       const end = new THREE.Group();
       end.position.y = -armLen * 0.9 - 0.06;
       lower.add(end);
@@ -262,10 +317,12 @@ export class CharacterModel {
       upper.position.set(sx * 0.11, 0, 0);
       this.hips.add(upper);
       upper.add(part(CAP(), s.pants, [0.075, thigh, 0.075], [0, 0, 0]));
+      if (s.accessories.includes('tracksuit')) upper.add(part(BOX(), 0xffffff, [0.012, thigh * 1.3, 0.03], [sx * 0.074, -thigh * 0.55, 0], 0));
       const lower = new THREE.Group();
       lower.position.y = -thigh;
       upper.add(lower);
       lower.add(part(CAP(), s.pants, [0.065, shin, 0.065], [0, 0, 0]));
+      if (s.accessories.includes('tracksuit')) lower.add(part(BOX(), 0xffffff, [0.012, shin * 1.2, 0.026], [sx * 0.064, -shin * 0.5, 0], 0));
       const end = new THREE.Group();
       end.position.y = -shin - 0.03;
       lower.add(end);
