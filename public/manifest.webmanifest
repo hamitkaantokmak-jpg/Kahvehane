@@ -1,0 +1,14 @@
+{
+  "name": "Kahvehane",
+  "short_name": "Kahvehane",
+  "lang": "tr",
+  "start_url": "./",
+  "scope": "./",
+  "display": "fullscreen",
+  "orientation": "landscape",
+  "background_color": "#2a1a10",
+  "theme_color": "#2a1a10",
+  "icons": [
+    { "src": "icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any" }
+  ]
+}
