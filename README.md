@@ -9,6 +9,16 @@ npm test         # kural motoru birim testleri (Vitest)
 npm run build    # tip kontrolü + üretim derlemesi
 ```
 
+## Telefonda oynamak (GitHub Pages)
+
+`main` dalına her gönderimde `.github/workflows/deploy.yml` testleri çalıştırır, oyunu derler ve GitHub Pages'e yayınlar:
+**https://hamitkaantokmak-jpg.github.io/Kahvehane/**
+
+- İlk kurulumda depo ayarlarında **Settings → Pages → Source: GitHub Actions** seçili olmalı.
+- Telefonda tarayıcıdan açıp **Ana ekrana ekle** dersen tam ekran, uygulama gibi açılır (yatay tutman önerilir).
+- Kaydın (para, ayarlar) o telefonun tarayıcısında saklanır; bilgisayardaki kayıtla paylaşılmaz.
+- Aynı Wi-Fi'de bilgisayardan oynatmak için: `npm run dev` → terminaldeki `Network:` adresini telefonda aç.
+
 ## Kontroller
 Masaüstü: WASD yürü · Shift koş · fare (tıkla = pointer lock / sürükle) kamera · tekerlek zoom · E etkileşim/otur ·
 F ıstakayla şaplak · G çay fırlat · Q hareket menüsü · 1-8 hızlı hareket (selam, kahkaha, alkış, göbek at, masaya vur, laf at, çay iç, yüzünü sil) ·
