@@ -123,22 +123,6 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
 .slot { width: 42px; height: 58px; display: flex; align-items: flex-end; justify-content: center; border-radius: 6px; }
 .slot:empty { background: rgba(0,0,0,.08); }
 
-.okey-board { width: min(900px, 98vw); display: flex; flex-direction: column; align-items: center; gap: 4px; }
-.ob-top { display: flex; gap: 12px; align-items: center; }
-.ob-mid { display: flex; width: 100%; justify-content: space-between; align-items: center; }
-.ob-side { display: flex; gap: 8px; align-items: center; }
-.ob-center { display: flex; gap: 14px; align-items: center; background: rgba(47, 143, 78, .9); border: 3px solid var(--ink); border-radius: 16px; padding: 8px 14px; }
-.opp { background: var(--paper); border: 3px solid var(--ink); border-radius: 12px; padding: 4px 10px; text-align: center; min-width: 120px; }
-.opp .nm { font-weight: 800; }
-.opp .meta { font-size: 12px; }
-.opp.turn { background: var(--gold); animation: glow 1.2s infinite; }
-.pile { display: flex; flex-direction: column; align-items: center; gap: 2px; min-width: 50px; }
-.pile .pl { font-size: 10px; color: var(--paper); font-weight: 700; text-align: center; max-width: 110px; }
-.pile .empty { width: 40px; height: 56px; border: 2px dashed rgba(255,243,214,.5); border-radius: 6px; color: var(--paper); display: flex; align-items: center; justify-content: center; }
-.pile.clickable { cursor: pointer; }
-.pile.clickable .tile, .pile.clickable.glow { animation: glow 1.2s infinite; border-radius: 8px; }
-.pile.drop { border: 3px dashed rgba(255,243,214,.6); border-radius: 12px; padding: 4px 18px; }
-.pile.drop.drop-hover { background: rgba(242,177,52,.4); border-color: var(--gold); }
 .deck { position: relative; display: flex; flex-direction: column; align-items: center; cursor: default; }
 .deck.clickable { cursor: pointer; }
 .deck.glow .tile { animation: glow 1.2s infinite; }
@@ -148,23 +132,105 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
 .okeyinfo { background: var(--paper); border-radius: 8px; padding: 2px 8px; font-weight: 700; border: 2px solid var(--ink); }
 
 /* 101 */
-.okey-board.compact .p101 { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
-.p101 .opp { display: flex; align-items: center; gap: 6px; min-width: 0; text-align: left; }
-.p101 .pile.mini { min-width: 30px; }
-.p101 .ob-center { padding: 4px 8px; gap: 8px; }
-.pile.mini.p-mine { padding: 2px 10px; }
-.meld-table { width: min(960px, 98vw); max-height: 26vh; overflow: auto; display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; background: rgba(47, 143, 78, .85); border: 3px solid var(--ink); border-radius: 14px; align-content: flex-start; min-height: 54px; }
-.meld-table .muted { color: var(--paper); }
 .meld { display: flex; gap: 1px; align-items: center; background: rgba(0,0,0,.18); border-radius: 8px; padding: 3px 4px; position: relative; cursor: pointer; }
-.meld .owner { font-size: 9px; color: #fff; writing-mode: vertical-rl; transform: rotate(180deg); margin-right: 2px; }
 .meld.target { box-shadow: 0 0 0 3px var(--gold); animation: glow 1.2s infinite; }
 .meld.pair { background: rgba(29, 95, 196, .3); }
-.stage { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: center; }
 .stage-sum { background: var(--paper); border: 2px solid var(--ink); border-radius: 8px; padding: 2px 10px; font-weight: 700; }
 .stage-sum.ok { background: #8ee6a4; }
-.staged-list { display: flex; gap: 6px; flex-wrap: wrap; }
 .meld.staged { background: rgba(242, 177, 52, .5); cursor: default; }
 .meld .x { border: 2px solid var(--ink); border-radius: 50%; background: var(--red); color: #fff; width: 22px; height: 22px; font-size: 11px; cursor: pointer; padding: 0; margin-left: 3px; }
+
+/* ------------------------------------------------ okey masası (masaya odaklı görünüm) */
+.gui.okey { padding-top: 150px; }
+.otable { position: relative; flex: 1 1 auto; min-height: 0; width: min(1120px, 98vw); display: flex; }
+.okey:not(.okey101) .otable { max-height: 400px; }
+.felt { position: relative; flex: 1; min-width: 0; display: grid; gap: 6px; padding: 8px;
+  grid-template-columns: 62px minmax(0, 1fr) auto minmax(0, 1fr) 62px; grid-template-rows: auto minmax(0, 1fr) auto;
+  grid-template-areas: "tl top top top tr" "left left ctr right right" "bl bot bot bot br";
+  background: radial-gradient(ellipse at 50% 45%, #3fae64 0%, #26814e 60%, #1c6440 100%);
+  border: 8px solid #8a5228; outline: 3px solid var(--ink); border-radius: 26px;
+  box-shadow: inset 0 0 0 2px #c98a4b, inset 0 0 34px rgba(0,0,0,.35), 0 7px 0 #4d2a10; }
+.ozone { min-width: 0; min-height: 0; display: flex; flex-direction: column; gap: 5px; overflow: auto; border-radius: 14px; padding: 4px; transition: background .3s; scrollbar-width: thin; }
+.ozone.top { grid-area: top; align-items: center; }
+.ozone.bottom { grid-area: bot; align-items: center; justify-content: flex-end; }
+.ozone.left { grid-area: left; align-items: flex-start; justify-content: center; }
+.ozone.right { grid-area: right; align-items: flex-end; justify-content: center; }
+.ozone.turn { background: rgba(242, 177, 52, .16); box-shadow: inset 0 0 0 2px rgba(242, 177, 52, .7); }
+.otable.has-melds .ozone:not(.bottom) { cursor: zoom-in; }
+.omelds { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; align-content: flex-start; align-items: center; max-width: 100%; }
+.ozone.left .omelds { justify-content: flex-start; }
+.ozone.right .omelds { justify-content: flex-end; }
+.ohint { color: var(--paper); font-weight: 700; font-size: 13px; opacity: .85; text-align: center; padding: 4px 8px; }
+/* alt bölüm: masaüstünde durum → ıstaka → düğmeler alt alta */
+.odock { display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: 100%; }
+.odock .rack { order: 1; }
+.oside { display: contents; }
+.oside .status { order: 0; }
+.oside .gbtns { order: 2; }
+.oplate { display: inline-flex; align-items: center; gap: 6px; background: var(--paper); border: 2px solid var(--ink); border-radius: 10px; padding: 2px 8px; font-size: 12px; white-space: nowrap; max-width: 100%; flex: 0 0 auto; }
+.oplate .nm { font-weight: 800; font-size: 13px; overflow: hidden; text-overflow: ellipsis; }
+.oplate .cnt { background: repeating-linear-gradient(45deg, #2e7d6b, #2e7d6b 3px, #276b5c 3px, #276b5c 6px); color: #fff; border: 1px solid #1d4d42; border-radius: 4px; padding: 0 5px; font-weight: 900; font-size: 11px; }
+.oplate.turn { background: var(--gold); animation: glow 1.2s infinite; }
+.oplate.opened .meta { color: #1c6b38; }
+.ocenter { grid-area: ctr; align-self: center; display: flex; gap: 12px; align-items: center; justify-content: center; padding: 6px 12px; background: rgba(0, 0, 0, .14); border-radius: 16px; }
+.opile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; border-radius: 12px; padding: 4px 2px; }
+.opile.tl { grid-area: tl; } .opile.tr { grid-area: tr; } .opile.bl { grid-area: bl; } .opile.br { grid-area: br; }
+.opile .pl { font-size: 10px; color: var(--paper); font-weight: 800; text-align: center; }
+.opile.p-mine { border: 2px dashed rgba(255, 243, 214, .45); }
+.opile.p-mine.armed { border-color: var(--gold); background: rgba(242, 177, 52, .14); }
+.opile.drop-hover { background: rgba(242, 177, 52, .45) !important; border-color: var(--gold); }
+.opile.clickable { cursor: pointer; }
+.opile.glow .ostack > .tile:last-child { animation: glow 1.2s infinite; }
+.ostack { display: grid; }
+.ostack > * { grid-area: 1 / 1; }
+.ostack .tile.under { transform: translate(calc(var(--k) * -3px), calc(var(--k) * -3px)) rotate(calc(var(--k) * -5deg)); filter: brightness(.9); }
+.ostack .empty { width: 28px; height: 40px; border: 2px dashed rgba(255, 243, 214, .45); border-radius: 6px; color: var(--paper); font-size: 11px; font-weight: 800; display: flex; align-items: center; justify-content: center; }
+.ozoom { position: absolute; inset: 0; z-index: 6; background: rgba(20, 12, 6, .55); border-radius: 26px; display: flex; align-items: center; justify-content: center; padding: 8px; }
+.ozoom-panel { background: #26814e; border: 3px solid var(--ink); border-radius: 16px; padding: 10px; max-width: 100%; max-height: 100%; overflow: auto; display: flex; flex-direction: column; gap: 8px; box-shadow: var(--shadow); }
+.ozoom-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.ozoom .muted { color: var(--paper); font-size: 12px; text-align: center; }
+.ozoom .omelds { justify-content: center; }
+.ozoom .tile.small { width: 30px; height: 43px; }
+.ozoom .tile.small .num { font-size: 17px; }
+@media (max-width: 760px), (max-height: 520px) {
+  .gui.okey { padding-top: 54px; gap: 4px; }
+  .felt { grid-template-columns: 40px minmax(0, 1fr) auto minmax(0, 1fr) 40px; grid-template-rows: auto minmax(44px, 1fr) auto; gap: 3px; padding: 4px; border-width: 5px; border-radius: 18px; }
+  .ozoom { border-radius: 18px; }
+  .ozone { padding: 2px; gap: 3px; border-radius: 10px; }
+  .omelds { gap: 3px; }
+  .oplate { font-size: 10px; padding: 1px 6px; gap: 4px; border-radius: 8px; }
+  .oplate .nm { font-size: 11px; }
+  .ocenter { gap: 6px; padding: 3px 6px; }
+  .ocenter .tile:not(.small) { width: 26px; height: 38px; }
+  .ostack .empty { width: 22px; height: 32px; }
+  .meld { padding: 2px; border-radius: 6px; }
+  /* yan ve karşı kenarlar: küçük taşlar (dokununca büyür) */
+  .ozone:not(.bottom) .meld .tile.small { width: 15px; height: 21px; padding-top: 1px; border-width: 1px; border-radius: 3px; box-shadow: 0 1px 0 #b9935f; }
+  .ozone:not(.bottom) .meld .tile.small .num { font-size: 10px; }
+  .ozone:not(.bottom) .meld .tile.small .dot { display: none; }
+  .ozone:not(.bottom) .meld .tile.joker::after { font-size: 9px; top: -6px; right: -4px; }
+  .game-root .throw-btn, .game-root .objection-btn { top: 12px; padding: 4px 8px; }
+  .game-root .throw-btn { left: 182px; } .game-root .objection-btn { left: 226px; }
+  .throw-btn .lb, .objection-btn .lb { display: none; }
+  .game-root .throw-pick { top: 52px; left: 182px; }
+}
+/* yatay telefon: ıstaka solda, durum + düğmeler sağda → masaya yer kalır */
+@media (max-height: 520px) and (min-width: 600px) {
+  .odock { flex-direction: row; align-items: stretch; width: 98vw; gap: 6px; }
+  .oside { display: flex; flex-direction: column; justify-content: center; gap: 4px; flex: 1; min-width: 0; }
+  .oside .status { font-size: 11px; padding: 2px 6px; line-height: 1.25; max-width: none; }
+  .oside .status .hand-no { display: block; margin-left: 0; font-size: 10px; opacity: .8; }
+  .oside .gbtns { gap: 4px; }
+  .oside .gbtns button { padding: 4px 8px; font-size: 12px; }
+}
+@media (max-width: 520px) {
+  .gui.okey { padding-top: 104px; }
+  .ozone.left .oplate, .ozone.right .oplate { flex-wrap: wrap; white-space: normal; justify-content: center; row-gap: 0; }
+  .oplate .nm { min-width: 3.5em; }
+  .game-root .throw-btn, .game-root .objection-btn { top: 58px; }
+  .game-root .throw-btn { left: 12px; } .game-root .objection-btn { left: 56px; }
+  .game-root .throw-pick { top: 96px; left: 12px; }
+}
 
 /* tavla */
 .twrap { display: flex; gap: 8px; align-items: stretch; max-width: 98vw; }
@@ -247,10 +313,6 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
   .slot { width: 27px; height: 40px; }
   .rack { padding: 4px; }
   .rack-row { gap: 1px; padding-bottom: 4px; }
-  .opp { min-width: 0; padding: 2px 6px; }
-  .opp .meta { font-size: 10px; }
-  .pile .empty { width: 26px; height: 38px; }
-  .ob-center { padding: 4px 8px; gap: 8px; }
   .status { font-size: 12px; padding: 3px 8px; }
   .primary, .accent, .ghost, .danger { padding: 5px 10px; font-size: 13px; }
   .card { width: 50px; height: 72px; }
@@ -263,14 +325,11 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
 @media (max-height: 520px) {
   .trow { height: 30vh; }
   .ptable { height: 28vh; }
-  .meld-table { max-height: 18vh; }
 }
 @media (max-width: 520px) {
   .rack .slot { width: min(27px, calc((96vw - 34px) / 16)); height: auto; aspect-ratio: .68; }
   .rack .tile { width: 100%; height: 100%; }
   .rack .tile .num { font-size: min(15px, 3.8vw); }
-  .opp .nm { font-size: 13px; }
-  .ob-center { gap: 6px; }
   .okeyinfo { font-size: 12px; }
   .bubble { font-size: 12px; max-width: 160px; }
 }

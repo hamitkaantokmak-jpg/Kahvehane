@@ -212,7 +212,7 @@ export class TableSession implements GameHost {
 
   /** İtiraz: bota haksızlık iddiası — gerçek hile tespiti yok; yalnızca replik ve gerginlik */
   private addObjectionButton() {
-    const b = btn('🙋 İtiraz!', 'small objection-btn', () => {
+    const b = btn('🙋<span class="lb"> İtiraz!</span>', 'small objection-btn', () => {
       const old = this.root.querySelector('.objection-pick');
       if (old) { old.remove(); return; }
       const pick = h('div', 'throw-pick objection-pick');
@@ -307,7 +307,7 @@ export class TableSession implements GameHost {
   /** Masada çay fırlatma: yalnızca görsel/sosyal, oyunu etkilemez */
   private addThrowButton() {
     if (this.game.settings.teaThrow === 'off') return;
-    const b = btn('💦 Çay fırlat', 'small throw-btn', () => {
+    const b = btn('💦<span class="lb"> Çay fırlat</span>', 'small throw-btn', () => {
       const old = this.root.querySelector('.throw-pick');
       if (old) { old.remove(); return; }
       const pick = h('div', 'throw-pick');

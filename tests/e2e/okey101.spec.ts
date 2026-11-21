@@ -29,7 +29,9 @@ test('101: per hazırlayıp 101 ile açma, işleme, ceza penceresi, geri koy, el
   expect(await withUI(page, 'return [s.opened[0], s.table.length]')).toEqual(['melds', 3]);
   // işleme: 10 → kırmızı 11-13 serisine
   await selectIds(page, ids.on1);
-  await page.locator('.meld-table .meld').first().click();
+  // kendi açtığın perler senin önünde (alt kenar) durur
+  await expect(page.locator('.ozone.bottom .meld[data-owner="0"]')).toHaveCount(3);
+  await page.locator('.ozone.bottom .meld[data-owner="0"]').first().click();
   expect(await withUI(page, 'return s.table[0].tiles.length')).toBe(4);
   // cezalı atış: ikinci kırmızı 10 gruba işlenebilir → kendi penceremiz çıkar, vazgeç
   await selectIds(page, ids.on2);
@@ -46,7 +48,7 @@ test('101: per hazırlayıp 101 ile açma, işleme, ceza penceresi, geri koy, el
   // yerden alma + geri koy
   await expect(page.locator('.status')).toContainText('çek', { timeout: 90_000 });
   await withUI(page, `if (!s.discards[3].length) s.discards[3].push({ id: 990, color: 1, num: 12, fake: false }); ui.refresh();`);
-  await page.locator('.p101 .pile.clickable').click();
+  await page.locator('.opile.bl.clickable').click();
   await expect(page.locator('.gbtns button:has-text("Geri koy")')).toBeVisible();
   await page.locator('.gbtns button:has-text("Geri koy")').click();
   expect(await withUI(page, 'return [s.phase, s.takenDiscard]')).toEqual(['draw', null]);
@@ -102,9 +104,40 @@ test('101: masadaki okeyi gerçek taşla değiştirip alma + katlamalı seçene�
     s.hands[0] = [r5, T(1,1), T(2,2), T(1,8)]; s.current = 0; s.phase = 'play'; s.opened[0] = 'melds';
     s.table = [{ id: 77, owner: 1, kind: 'run', tiles: run, slots: [{tileId: run[0].id, color:0, num:4},{tileId: okey.id, color:0, num:5},{tileId: run[2].id, color:0, num:6}] }];
     ui.rack.slots.fill(null); ui.refresh(); return r5.id;`);
+  // rakibin (sağdaki 1) peri onun önünde; tek taş seçiliyken parlar ve tıklanınca işlenir
+  await expect(page.locator('.ozone.right .meld[data-meld="77"]')).toBeVisible();
   await page.locator(`.rack .tile[data-id="${red5}"]`).click();
-  await page.locator('.meld-table .meld').first().click();
+  await expect(page.locator('.ozone.right .meld[data-meld="77"].target')).toBeVisible();
+  await page.locator('.ozone.right .meld[data-meld="77"]').click();
   await expect(page.locator('.rack .tile.joker')).toHaveCount(1);
   expect(await withUI(page, 'return s.table[0].tiles.map((t) => t.num)')).toEqual([4, 5, 6]);
+  expect(errs).toEqual([]);
+});
+
+test('101 masa görünümü: herkesin peri kendi önünde; dar ekranda kenara dokununca büyür', async ({ page }) => {
+  await page.setViewportSize({ width: 844, height: 390 });
+  const errs = trackErrors(page);
+  await boot(page);
+  await openGame(page, 'okey101');
+  await withUI(page, `
+    let id = 800; const T = (c, n) => ({ id: id++, color: c, num: n, fake: false });
+    const run = (owner, c, a) => { const tiles = [T(c,a), T(c,a+1), T(c,a+2)]; return { id: id++, owner, kind: 'run', tiles, slots: tiles.map((t) => ({ tileId: t.id, color: c, num: t.num })) }; };
+    s.table = [run(0, 0, 1), run(1, 1, 4), run(1, 2, 8), run(2, 3, 2), run(3, 0, 9)];
+    s.opened = ['melds', 'melds', 'melds', 'melds'];
+    ui.refresh();`);
+  await expect(page.locator('.ozone.bottom .meld')).toHaveCount(1);
+  await expect(page.locator('.ozone.right .meld')).toHaveCount(2);
+  await expect(page.locator('.ozone.top .meld')).toHaveCount(1);
+  await expect(page.locator('.ozone.left .meld')).toHaveCount(1);
+  for (const z of ['bottom', 'right', 'top', 'left']) await expect(page.locator(`.ozone.${z} .meld`).first()).toBeInViewport();
+  // sağ kenara dokun → büyük görünüm; kapat
+  await page.locator('.ozone.right .oplate').click();
+  await expect(page.locator('.ozoom .meld')).toHaveCount(2);
+  await page.locator('.ozoom .x').click();
+  await expect(page.locator('.ozoom')).toHaveCount(0);
+  // atılan taşlar köşelerde: soldakinin (3) taşı sol altta
+  await withUI(page, `s.discards[3].push({ id: 990, color: 1, num: 12, fake: false }); ui.refresh();`);
+  await expect(page.locator('.opile.bl .tile[data-id="990"]')).toBeVisible();
+  await page.screenshot({ path: 'test-results/okey101-masa-yatay.png' });
   expect(errs).toEqual([]);
 });
