@@ -53,6 +53,10 @@ export function chooseBatakCard(v: BatakView, rng: Rng, diff: Difficulty = 'medi
     if (last || isMaster(pc, v.hand, memory)) return lowest(legal.filter((c) => c.suit !== trump).length ? legal.filter((c) => c.suit !== trump) : legal).id;
   }
   const win = cheapestWinner(legal, v.trick, trump, v.me);
+  // "el almayan cezalı": ihaleyi almayan taraftaysan ve henüz hiç el almadıysan (eşlide takımca) ilk fırsatta al
+  const bidSide = v.bidder === v.me || (v.partners && v.bidder === partnerOf(v.me));
+  const myTricks = v.tricksWon[v.me] + (v.partners ? v.tricksWon[partnerOf(v.me)] : 0);
+  if (win && v.zeroPenalty && !bidSide && myTricks === 0 && diff !== 'easy') return win.id;
   // sonuncuysam en ucuz kazananla al; değilsem ancak kartım rengin en büyüğüyse ya da kozsa al
   if (win) {
     const last = v.trick.length === 3;

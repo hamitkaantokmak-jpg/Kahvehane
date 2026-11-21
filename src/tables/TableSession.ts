@@ -55,6 +55,7 @@ export interface GameOptions {
   pistiTarget: number;
   batakHands: number;
   batakPartners: boolean;
+  batakZeroPenalty: boolean;
   kingShort: boolean;
 }
 
@@ -67,7 +68,7 @@ export class TableSession implements GameHost {
   ui: GameUI | null = null;
   private exitConfirm: HTMLDivElement | null = null;
   readonly table3d: TableView3D;
-  options: GameOptions = { difficulty: 'medium', okey101Hands: 3, okey101Doubling: false, stake: 0, tavlaKatmerli: true, tavlaTarget: 5, pistiTarget: 151, batakHands: 5, batakPartners: false, kingShort: false };
+  options: GameOptions = { difficulty: 'medium', okey101Hands: 3, okey101Doubling: false, stake: 0, tavlaKatmerli: true, tavlaTarget: 5, pistiTarget: 151, batakHands: 5, batakPartners: false, batakZeroPenalty: false, kingShort: false };
 
   constructor(private game: Game, readonly seat: Seat) {
     this.root = h('div', 'game-root');
@@ -100,7 +101,8 @@ export class TableSession implements GameHost {
         opts.innerHTML = `<label>Hedef <select data-o="pistiTarget"><option value="51">51</option><option value="101">101</option><option value="151" selected>151</option></select></label>`;
       } else if (gid === 'batak') {
         opts.innerHTML = `<label>El sayısı <select data-o="batakHands"><option value="3">3</option><option value="5" selected>5</option><option value="7">7</option><option value="11">11</option></select></label>
-          <label class="row"><input type="checkbox" data-o="batakPartners"> Eşli (karşındaki ortağın)</label>`;
+          <label class="row"><input type="checkbox" data-o="batakPartners"> Eşli (karşındaki ortağın)</label>
+          <label class="row"><input type="checkbox" data-o="batakZeroPenalty"> El almayan cezalı (ihale kadar eksi)</label>`;
       } else if (gid === 'king') {
         opts.innerHTML = `<label class="row"><input type="checkbox" data-o="kingShort"> Kısa King (8 el)</label>`;
       }
@@ -396,7 +398,7 @@ export class TableSession implements GameHost {
       case 'tavla': return new TavlaUI(this, { target: this.options.tavlaTarget, katmerliMars: this.options.tavlaKatmerli });
       case 'pisti2': return new PistiUI(this, { players: 2, target: this.options.pistiTarget });
       case 'pisti4': return new PistiUI(this, { players: 4, target: this.options.pistiTarget });
-      case 'batak': return new BatakUI(this, { partners: this.options.batakPartners, hands: this.options.batakHands });
+      case 'batak': return new BatakUI(this, { partners: this.options.batakPartners, hands: this.options.batakHands, zeroPenalty: this.options.batakZeroPenalty });
       case 'king': return new KingUI(this, { short: this.options.kingShort });
     }
   }

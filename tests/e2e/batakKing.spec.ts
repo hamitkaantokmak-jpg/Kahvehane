@@ -41,12 +41,12 @@ test('Batak: ihale (13 = hemen biter), koz seçimi, kural dışı kart engelleni
   expect(errs).toEqual([]);
 });
 
-test('Batak eşli: ortaklar aynı puanı alır, maç sonunda kazanan takım belli olur', async ({ page }) => {
+test('Batak eşli + el almayan cezalı: ortaklar aynı puanı alır, maç sonunda kazanan takım belli olur', async ({ page }) => {
   test.setTimeout(240_000);
   const errs = trackErrors(page);
   await boot(page);
-  await openGame(page, 'batak', `document.querySelector('.game-card[data-game="batak"] input[data-o="batakPartners"]').click(); const sel = document.querySelector('.game-card[data-game="batak"] select[data-o="batakHands"]'); sel.value = '3'; sel.dispatchEvent(new Event('change'));`);
-  expect(await withUI(page, 'return [s.options.partners, s.options.hands]')).toEqual([true, 3]);
+  await openGame(page, 'batak', `document.querySelector('.game-card[data-game="batak"] input[data-o="batakPartners"]').click(); document.querySelector('.game-card[data-game="batak"] input[data-o="batakZeroPenalty"]').click(); const sel = document.querySelector('.game-card[data-game="batak"] select[data-o="batakHands"]'); sel.value = '3'; sel.dispatchEvent(new Event('change'));`);
+  expect(await withUI(page, 'return [s.options.partners, s.options.hands, s.options.zeroPenalty]')).toEqual([true, 3, true]);
   await expect(page.locator('.bid-panel button[data-bid="7"]')).toBeVisible(); // eşlide en az 7
   await expect(page.locator('.pseat.top .oplate')).toContainText('ortak');
   await withUI(page, 's.handNo = 3; ui.refresh();'); // son el
@@ -61,6 +61,10 @@ test('Batak eşli: ortaklar aynı puanı alır, maç sonunda kazanan takım bell
     await page.waitForTimeout(120);
   }
   await expect(page.locator('.modal')).toContainText('Maçı');
+  await expect(page.locator('.modal')).toContainText('El almayan cezalı');
+  // puanlar kurala uygun: ihaleci olmayan takım hiç el almadıysa ihale kadar eksi
+  const chk = await withUI<{ ok: boolean }>(page, `const t = (p) => s.tricksWon[p] + s.tricksWon[(p + 2) % 4]; const b = s.bidder; const other = (b + 1) % 2; const want = t(other) === 0 ? -s.highBid : t(other); return { ok: s.handScores[other] === want };`);
+  expect(chk.ok).toBe(true);
   const t = await withUI<number[]>(page, 'return s.totals');
   expect(t[0]).toBe(t[2]);
   expect(t[1]).toBe(t[3]);
