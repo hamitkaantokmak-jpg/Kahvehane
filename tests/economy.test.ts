@@ -165,7 +165,7 @@ describe('Bahis hesapları', () => {
 });
 
 import { EconomyController } from '../src/economy/EconomyController';
-import { PERSONALITIES } from '../src/npc/personalities';
+import { PERSONALITIES } from '../src/npc/roster';
 
 describe('EconomyController', () => {
   it('her işlemde kaydeder ve dinleyiciye fark bildirir', () => {

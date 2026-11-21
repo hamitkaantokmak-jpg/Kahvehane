@@ -7,6 +7,7 @@
  */
 import * as THREE from 'three';
 import { CharacterModel } from './CharacterModel';
+import { ARCHETYPES, NEUTRAL_GAIT, NEUTRAL_HABITS, pickHabit, Gait, IdleHabits, SitStyle } from '../npc/archetypes';
 
 export interface Pose {
   bodyY: number; // kalça yükseklik ofseti
@@ -52,6 +53,8 @@ interface ActionDef {
 }
 
 const S = Math.sin;
+/** Eller arkada kavuşturulmuş poz (omuz geriye, dirsek bükük) */
+const HB = { sh: 0.6, z: -0.12, el: -1.4 };
 const ease = (x: number) => x * x * (3 - 2 * x);
 const pulse = (p: number, a: number, b: number) => (p < a ? 0 : p > b ? 0 : S(((p - a) / (b - a)) * Math.PI));
 
@@ -263,7 +266,11 @@ export class Animator {
   private lookYaw = 0;
   private lookPitch = 0;
   readonly pose: Pose = { ...ZERO_POSE };
-  private idleVariant = 0;
+  private idleVariant: keyof IdleHabits | 'none' = 'none';
+  /** Tipe göre yürüyüş / oturuş / bekleme alışkanlıkları (npc/archetypes.ts) */
+  gait: Gait = NEUTRAL_GAIT;
+  sitStyle: SitStyle | null = null;
+  habits: IdleHabits = NEUTRAL_HABITS;
   private talkT = 0;
   /** Konuşma animasyonu (yalnızca ağız/baş, kol jesti yok) */
   speak(seconds: number) { this.talkT = Math.max(this.talkT, seconds); }
@@ -272,6 +279,8 @@ export class Animator {
 
   constructor(model: CharacterModel) {
     this.model = model;
+    const a = model.spec.archetype ? ARCHETYPES[model.spec.archetype] : null;
+    if (a) { this.gait = a.gait; this.sitStyle = a.sit; this.habits = a.idle; }
   }
 
   play(name: ActionName, opts: { loop?: boolean } = {}): void {
@@ -315,7 +324,8 @@ export class Animator {
     const walkW = Math.min(1, sp / 1.2) * (1 - this.sitW);
     const runW = Math.min(1, Math.max(0, (sp - 2.0) / (this.runThreshold - 2.0))) * (1 - this.sitW);
     const stride = 1.6 + (this.model.spec.legLength < 0.47 ? 0.6 : 0);
-    this.phase += dt * (sp * stride * 1.6 + 0.0001);
+    const g = this.gait;
+    this.phase += dt * (sp * stride * 1.6 * g.cadence + 0.0001);
     const ph = this.phase;
     // nefes / bekleme
     const breathe = S(this.time * 1.8);
@@ -323,11 +333,19 @@ export class Animator {
     base.headX = S(this.time * 0.7) * 0.03;
     // bekleme varyasyonları (aynı animasyonu sürekli tekrar etmemek için)
     this.idleVariantT -= dt;
-    if (this.idleVariantT <= 0) { this.idleVariant = Math.floor(Math.random() * 4); this.idleVariantT = 3 + Math.random() * 5; }
+    if (this.idleVariantT <= 0) { this.idleVariant = pickHabit(this.habits, Math.random()); this.idleVariantT = 3 + Math.random() * 5; }
+    // kambur duruş (tip): gövde öne, baş dengelemek için yukarı
+    const hunch = g.hunch * (1 - this.sitW);
+    base.lean += hunch;
+    base.headX -= hunch * 0.8;
     if (sp < 0.2 && !seated) {
-      if (this.idleVariant === 1) { base.headY = S(this.time * 0.9) * 0.4; }
-      else if (this.idleVariant === 2) { base.shLX = -0.25; base.shRX = -0.25; base.shLZ = 0.45; base.shRZ = -0.45; base.elL = -1.6; base.elR = -1.6; base.twist = S(this.time) * 0.06; } // eller arkada
-      else if (this.idleVariant === 3) { base.tilt = S(this.time * 1.2) * 0.07; base.hipLX = 0.05; }
+      const v = this.idleVariant;
+      if (v === 'lookAround') { base.headY = S(this.time * 0.9) * 0.4; }
+      else if (v === 'handsBehind') { base.shLX = HB.sh; base.shRX = HB.sh; base.shLZ = HB.z; base.shRZ = -HB.z; base.elL = HB.el; base.elR = HB.el; base.twist = S(this.time) * 0.06; } // eller arkada
+      else if (v === 'sway') { base.tilt = S(this.time * 1.2) * 0.07; base.hipLX = 0.05; }
+      else if (v === 'armsCrossed') { base.shLX = -0.75; base.shRX = -0.75; base.shLZ = -0.25; base.shRZ = 0.25; base.elL = -1.9; base.elR = -1.9; base.headX += 0.04; } // kollar kavuşturulmuş
+      else if (v === 'handsOnHips') { base.shLX = 0.25; base.shRX = 0.25; base.shLZ = 0.7; base.shRZ = -0.7; base.elL = -1.5; base.elR = -1.5; base.lean -= 0.05; } // eller belde
+      else if (v === 'bounce') { base.bodyY += Math.abs(S(this.time * 7)) * 0.025; base.headY = S(this.time * 1.7) * 0.5; base.squash += S(this.time * 14) * 0.015; } // yerinde duramaz
     }
     // yürüme
     const sw = S(ph);
@@ -337,15 +355,23 @@ export class Animator {
     base.hipRX = -sw * amp * walkW;
     base.kneeL = Math.max(0, -S(ph + 1.2)) * (0.9 + runW * 0.6) * walkW;
     base.kneeR = Math.max(0, S(ph + 1.2)) * (0.9 + runW * 0.6) * walkW;
-    base.shLX += -sw * (0.5 + runW * 0.5) * walkW;
-    base.shRX += sw * (0.5 + runW * 0.5) * walkW;
+    const arm = (0.5 * g.armSwing + runW * 0.5);
+    base.shLX += -sw * arm * walkW;
+    base.shRX += sw * arm * walkW;
+    // elleri arkada yürüyüş (emekli): koşmuyorsa kollar arkada kavuşur
+    const hb = g.handsBehind ? walkW * (1 - runW) : 0;
+    if (hb > 0) {
+      base.shLX = base.shLX * (1 - hb) + HB.sh * hb; base.shRX = base.shRX * (1 - hb) + HB.sh * hb;
+      base.shLZ = base.shLZ * (1 - hb) + HB.z * hb; base.shRZ = base.shRZ * (1 - hb) - HB.z * hb;
+      base.elL = base.elL * (1 - hb) + HB.el * hb; base.elR = base.elR * (1 - hb) + HB.el * hb;
+    }
     base.elL += -0.4 * runW * walkW - 0.6 * runW;
     base.elR += -0.4 * runW * walkW - 0.6 * runW;
-    base.bodyY += Math.abs(sw2) * 0.05 * walkW + Math.abs(sw2) * 0.05 * runW;
-    base.squash += -Math.abs(sw2) * 0.03 * walkW - 0.04 * runW * Math.abs(S(ph * 2 + 0.6));
-    base.tilt += sw * 0.07 * walkW;
-    base.twist += sw * 0.12 * walkW;
-    base.lean += 0.06 * walkW + 0.22 * runW;
+    base.bodyY += Math.abs(sw2) * 0.05 * walkW * g.bounce + Math.abs(sw2) * 0.05 * runW;
+    base.squash += -Math.abs(sw2) * 0.03 * walkW * g.bounce - 0.04 * runW * Math.abs(S(ph * 2 + 0.6));
+    base.tilt += sw * 0.07 * walkW * g.sway;
+    base.twist += sw * 0.12 * walkW * (0.5 + g.sway * 0.5);
+    base.lean += (0.06 + g.lean) * walkW + 0.22 * runW;
     base.headX -= 0.05 * walkW + 0.1 * runW;
     // oturma
     if (this.sitW > 0) {
@@ -361,6 +387,14 @@ export class Animator {
       base.shRX = base.shRX * (1 - w) - 0.5 * w;
       base.elL = base.elL * (1 - w) - 0.8 * w;
       base.elR = base.elR * (1 - w) - 0.8 * w;
+      // tipe göre oturuş
+      if (this.posture === 'sit' && this.sitStyle) {
+        const st = this.sitStyle;
+        if (st === 'slouch') { base.lean += -0.2 * w; base.headX += 0.1 * w; base.elL += -0.5 * w; base.elR += -0.5 * w; base.bodyZ += -0.03 * w; } // arkaya yaslanmış, eller göbekte
+        else if (st === 'upright') { base.lean += 0.05 * w; base.headX += -0.04 * w; base.shLX += -0.15 * w; base.shRX += -0.15 * w; base.elL += 0.3 * w; base.elR += 0.3 * w; } // dimdik, eller dizde
+        else if (st === 'forward') { base.lean += 0.3 * w; base.headX += -0.25 * w; base.shLX += -0.35 * w; base.shRX += -0.35 * w; base.elL += -0.5 * w; base.elR += -0.5 * w; } // öne eğik, dirsekler dizde
+        else if (st === 'relaxed') { base.lean += -0.1 * w; base.twist += 0.1 * w; base.shRZ += -0.6 * w; base.elR += 0.4 * w; } // rahat, kol sandalyede
+      }
       if (this.posture === 'sleepSit') {
         base.lean = -0.15 * w; base.rootRotX = -0.12 * w;
         base.headX = 0.55 + S(this.time * 0.8) * 0.06; base.headZ = 0.3;

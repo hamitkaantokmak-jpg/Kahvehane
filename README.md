@@ -35,7 +35,7 @@ Mobil: sol yarı sanal joystick (uzağa çekince koşar), sağ yarı kamera, ✋
 | `src/games/atyarisi` | TV at yarışı motoru (saf, tohumlu) |
 | `src/world` | Kahvehane sahnesi, materyaller, prosedürel dokular, çarpışma + A* yol bulma |
 | `src/characters` | Modüler karakter tanımı (gelecekteki karakter oluşturucu için), model, prosedürel animatör |
-| `src/npc` | Kişilikler/replikler (dost/rakip ilişkileri), davranış sistemi, kavga davranış katmanı (`BrawlController`) |
+| `src/npc` | **Kadro (`roster.ts`)**: her NPC tek yerde (tip, görünüş farkı, kişilik değerleri, dost/rakip, ses); **tipler (`archetypes.ts`, saf)**; replikler (`personalities.ts`); davranış sistemi; kavga katmanı (`BrawlController`) |
 | `src/interactions` | Istaka şaplağı, emote'lar, laf atma, çay ısmarlama |
 | `src/tables` | Masa oturumu: oyun seçimi, botların masaya yerleşmesi, 3D masa geri bildirimi |
 | `src/ui` | HUD, konuşma balonları, oyun arayüzleri (DOM) |
@@ -62,6 +62,21 @@ Klasik Okey ve 101, yukarıdan bakılan yeşil çuha bir masada oynanır (`src/u
   alabileceğin taş (soldakinin attığı) sol altta. Ortada deste, gösterge ve okey.
 - Dar ekranda yan ve karşı kenarlardaki perler küçük çizilir; o kenara dokununca büyük görünüm açılır.
   Yatay telefonda ıstaka solda, durum ve düğmeler sağda durur.
+
+## NPC tipleri
+Her müdavim bir tipe bağlıdır. Tip; kıyafeti, yürüyüşü, oturuşu, ayakta bekleme huylarını, sesi ve davranışın
+varsayılanlarını verir. NPC tanımı (`src/npc/roster.ts`) yalnızca tipten farkını yazar. Uzaktan bile kim hangi tip, anlaşılsın diye:
+
+| Tip | Kim | Görünüş | Hareket | Davranış |
+|---|---|---|---|---|
+| Emekli dayı | Rıza, Hasan | yelek, tespih, göbek, kambur | ağır, **elleri arkada** yürür; arkaya yaslanıp oturur; eller arkada bekler | bolca akıl verir (kibitz ×1,6) |
+| Esnaf | Cemal | kolları sıvalı gömlek, **kulakta kalem**, cepte not defteri | hızlı adım, kollar sallanır; rahat oturur, kolu sandalyede; elleri belde bekler | pazarlıkçı, bahse meraklı |
+| Delikanlı | Nihat, Ferhat | **eşofman** (beyaz şeritler, fermuar), ince | zıplayarak en hızlı yürür; öne eğilip oturur; yerinde duramaz | maç, kart, TV |
+| Memur | Muhtar Kemal | ceket, **kravat**, gözlük | dimdik ve ölçülü; dik oturur; kollarını kavuşturur | kurallara titiz, akıl verir (×1,3) |
+| Kahveci | Şükrü | önlük, papyon, **omzunda havlu** | çevik, dengeli | servis |
+
+Her tipin kendine özgü genel boşta replikleri de NPC'nin kendi repliklerine karışır. NPC'ye yaklaşınca ipucunda tipi yazar.
+Tip ve kadro verisi saf ve JSON'a çevrilebilir (sunucuya taşınabilir); birim testleri `tests/archetypes.test.ts`.
 
 ## Uygulanan kural varyantları
 **Klasik Okey:** 106 taş, başlayan 15 / diğerleri 14. Gösterge +1 = okey (13→1), sahte okey okeyin yerine geçer.

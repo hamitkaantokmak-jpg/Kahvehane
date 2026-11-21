@@ -10,6 +10,7 @@ test('Olaylar: TV\'de gol, kedi, elektrik kesintisi (karanlıkta okey oynanır)'
   // gol
   await G(page, `g.chaosEvents.tvGoal();`);
   expect(await page.evaluate(() => (window as unknown as W).__game.kahve.tv.overlay !== null)).toBe(true);
+  await G(page, 'for (const t of g.chaosEvents.timed) t.t = Math.max(t.t, t.dur - 0.3);'); // yavaş karede beklememek için sona ileri sar
   await page.waitForFunction(() => (window as unknown as W).__game.kahve.tv.overlay === null, null, { timeout: 30_000 });
   // kedi
   const t0 = await page.evaluate(() => (window as unknown as W).__game.chaos.tension);
@@ -46,7 +47,14 @@ test('Masa kaosu: itiraz (bekleme süreli), kibitz yorumu, Rıza okeyi kaybedinc
   expect(await page.evaluate(() => (window as unknown as W).__game.session.object((window as unknown as W).__game.session.participants[1]))).toBe(false);
   // kibitz
   await G(page, `g.session.kibitzT = 0;`);
-  await page.waitForFunction(() => { const s = (window as unknown as W).__game.session; s.kibitzT = Math.min(s.kibitzT, 0.2); return s.kibitzLines.length > 0; }, null, { timeout: 90_000 });
+  // izleyici yürüyorsa varacağı yere ışınla (yavaş karede yürüyüşü beklemeyelim)
+  await page.waitForFunction(() => {
+    const s = (window as unknown as W).__game.session;
+    s.kibitzT = Math.min(s.kibitzT, 0.2);
+    const k = s.kibitzer;
+    if (k && k.c.path.length > 1) { const end = k.c.path[k.c.path.length - 1]; k.c.pos.x = end.x; k.c.pos.z = end.z; k.c.path = [end]; }
+    return s.kibitzLines.length > 0;
+  }, null, { timeout: 90_000 });
   // masa devirme: Rıza masada ve kaybediyor
   const rizaIdx = await page.evaluate(() => (window as unknown as W).__game.session.participants.findIndex((p: any) => p !== 'player' && p.id === 'riza'));
   test.skip(rizaIdx < 0, 'Rıza bu masaya gelmedi');

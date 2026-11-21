@@ -256,10 +256,13 @@ export class TableSession implements GameHost {
     if (k && (k.inBrawl || !['returning', 'wander', 'kibitz'].includes(k.mode as string))) this.kibitzer = null;
     this.kibitzT -= dt;
     if (this.kibitzT > 0) return;
-    this.kibitzT = nextKibitzDelay(this.game.rng);
+    // akıl vermeye meraklı tip (emekli, memur) daha sık konuşur
+    this.kibitzT = nextKibitzDelay(this.game.rng) / (this.kibitzer?.p.kibitz ?? 1);
     if (!this.kibitzer) {
       const free = this.game.npcs.filter((n) => !n.inBrawl && n.id !== 'sukru' && ['idle', 'wander', 'tv', 'chat', 'seated'].includes(n.mode) && n.c.seat?.table !== this.table);
-      free.sort((a, b) => a.c.pos.distanceTo(this.table.center) - b.c.pos.distanceTo(this.table.center));
+      // yakın olan ve akıl vermeyi seven (tip) önce gelir
+      const cost = (n: NPC) => n.c.pos.distanceTo(this.table.center) / n.p.kibitz;
+      free.sort((a, b) => cost(a) - cost(b));
       const n = free[0];
       if (!n) return;
       // oyuncunun arkasında durup izler
@@ -268,7 +271,7 @@ export class TableSession implements GameHost {
       const back = new THREE.Vector3(-Math.sin(this.seat.yaw), 0, -Math.cos(this.seat.yaw));
       const spot = this.seat.pos.clone().addScaledVector(back, 0.9).add(new THREE.Vector3(0.5, 0, 0.3));
       n.mode = 'wander';
-      n.c.walkTo(this.game.nav, spot.x, spot.z, () => { n.c.faceTowards(this.table.center); }, 1.3);
+      n.c.walkTo(this.game.nav, spot.x, spot.z, () => { n.c.faceTowards(this.table.center); });
       (n as unknown as { timer: number }).timer = 999;
       this.kibitzer = n;
       return;
