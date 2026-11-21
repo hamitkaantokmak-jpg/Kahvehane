@@ -15,9 +15,9 @@ export interface BubbleHost {
 }
 
 export class Character {
-  readonly model: CharacterModel;
-  readonly anim: Animator;
-  readonly spec: CharacterSpec;
+  model: CharacterModel;
+  anim: Animator;
+  spec: CharacterSpec;
   readonly radius = 0.3;
   yaw = 0;
   /** hedef bakış yönü */
@@ -42,6 +42,29 @@ export class Character {
     this.model = new CharacterModel(spec);
     this.anim = new Animator(this.model);
     this.model.root.userData.character = this;
+  }
+
+  /**
+   * Görünüşü değiştir (karakter oluşturucu): modeli yerinde yeniden kurar.
+   * Konum, yön, görünürlük, duruş ve eldeki nesne korunur; sahnedeki yeri aynı kalır.
+   */
+  setSpec(spec: CharacterSpec) {
+    const old = this.model;
+    const oldAnim = this.anim;
+    const parent = old.root.parent;
+    const held = old.handPropR.children[0] ?? null;
+    this.spec = spec;
+    this.model = new CharacterModel(spec);
+    this.anim = new Animator(this.model);
+    this.anim.posture = oldAnim.posture;
+    this.anim.sitW = oldAnim.sitW;
+    this.anim.seatHeight = oldAnim.seatHeight;
+    this.model.root.position.copy(old.root.position);
+    this.model.root.rotation.copy(old.root.rotation);
+    this.model.root.visible = old.root.visible;
+    this.model.root.userData.character = this;
+    if (held) this.model.setHeldProp(held);
+    if (parent) { parent.remove(old.root); parent.add(this.model.root); }
   }
 
   get pos(): THREE.Vector3 {

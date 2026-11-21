@@ -28,6 +28,8 @@ export const VOICES: Record<string, VoiceProfile> = {
 };
 
 export function profileFor(id: string, voicePitch = 1): VoiceProfile {
+  // oyuncunun sesi karakter oluşturucudaki "ses inceliği" ile ayarlanır
+  if (id === 'player') return { ...VOICES.player, base: VOICES.player.base * voicePitch };
   return VOICES[id] ?? { base: 140 * voicePitch, rate: 8, range: 0.35, timbre: 'triangle', gain: 0.85 };
 }
 
