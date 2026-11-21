@@ -49,7 +49,7 @@ export interface Interactable {
 const TABLE_GAMES: Record<TableKind, GameId[]> = {
   okey: ['okey', 'okey101'],
   tavla: ['tavla'],
-  kart: ['pisti2', 'pisti4'],
+  kart: ['pisti2', 'pisti4', 'batak', 'king'],
 };
 
 export class Kahvehane {

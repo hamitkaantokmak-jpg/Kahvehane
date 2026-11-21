@@ -13,10 +13,12 @@ import { OkeyUI } from '../ui/games/OkeyUI';
 import { Okey101UI } from '../ui/games/Okey101UI';
 import { TavlaUI } from '../ui/games/TavlaUI';
 import { PistiUI } from '../ui/games/PistiUI';
+import { BatakUI } from '../ui/games/BatakUI';
+import { KingUI } from '../ui/games/KingUI';
 import { TableView3D } from './TableView3D';
 import * as THREE from 'three';
 import { objectionOutcome, NoRepeatPicker, nextKibitzDelay, shouldFlipTable } from '../chaos/eventRules';
-import { STAKES, stakeCoins, okeyOutcome, okey101Outcome, pistiOutcome, tavlaOutcome, wantsRaise, Outcome, AppliedTransfer } from '../economy/Betting';
+import { STAKES, stakeCoins, okeyOutcome, okey101Outcome, pistiOutcome, tavlaOutcome, batakOutcome, kingOutcome, wantsRaise, Outcome, AppliedTransfer } from '../economy/Betting';
 
 export type ReactKind = 'think' | 'happy' | 'angry' | 'win' | 'lose' | 'goodMove' | 'slam' | 'play' | 'surprise';
 
@@ -51,6 +53,9 @@ export interface GameOptions {
   tavlaKatmerli: boolean;
   tavlaTarget: number;
   pistiTarget: number;
+  batakHands: number;
+  batakPartners: boolean;
+  kingShort: boolean;
 }
 
 export class TableSession implements GameHost {
@@ -62,7 +67,7 @@ export class TableSession implements GameHost {
   ui: GameUI | null = null;
   private exitConfirm: HTMLDivElement | null = null;
   readonly table3d: TableView3D;
-  options: GameOptions = { difficulty: 'medium', okey101Hands: 3, okey101Doubling: false, stake: 0, tavlaKatmerli: true, tavlaTarget: 5, pistiTarget: 151 };
+  options: GameOptions = { difficulty: 'medium', okey101Hands: 3, okey101Doubling: false, stake: 0, tavlaKatmerli: true, tavlaTarget: 5, pistiTarget: 151, batakHands: 5, batakPartners: false, kingShort: false };
 
   constructor(private game: Game, readonly seat: Seat) {
     this.root = h('div', 'game-root');
@@ -93,6 +98,11 @@ export class TableSession implements GameHost {
           <label class="row"><input type="checkbox" data-o="tavlaKatmerli" checked> Katmerli mars (3 puan)</label>`;
       } else if (gid === 'pisti2' || gid === 'pisti4') {
         opts.innerHTML = `<label>Hedef <select data-o="pistiTarget"><option value="51">51</option><option value="101">101</option><option value="151" selected>151</option></select></label>`;
+      } else if (gid === 'batak') {
+        opts.innerHTML = `<label>El sayısı <select data-o="batakHands"><option value="3">3</option><option value="5" selected>5</option><option value="7">7</option><option value="11">11</option></select></label>
+          <label class="row"><input type="checkbox" data-o="batakPartners"> Eşli (karşındaki ortağın)</label>`;
+      } else if (gid === 'king') {
+        opts.innerHTML = `<label class="row"><input type="checkbox" data-o="kingShort"> Kısa King (8 el)</label>`;
       }
       opts.querySelectorAll('[data-o]').forEach((el) => {
         el.addEventListener('click', (e) => e.stopPropagation());
@@ -375,6 +385,8 @@ export class TableSession implements GameHost {
     if (this.gameId === 'okey') this.settle(okeyOutcome(s.scores as number[]), `okey:${s.handNo}`);
     else if (this.gameId === 'okey101') this.settle(okey101Outcome(s.totals as number[]), `101:${s.handNo}`);
     else if (this.gameId === 'pisti2' || this.gameId === 'pisti4') this.settle(pistiOutcome(s.totals as number[], this.gameId === 'pisti2' ? 2 : 4), `pisti:${s.handNo}`);
+    else if (this.gameId === 'batak') this.settle(batakOutcome(s.totals as number[]), `batak:${s.handNo}`);
+    else if (this.gameId === 'king') this.settle(kingOutcome(s.totals as number[]), `king:${s.handNo}`);
   }
 
   private createUI(gid: GameId): GameUI {
@@ -384,6 +396,8 @@ export class TableSession implements GameHost {
       case 'tavla': return new TavlaUI(this, { target: this.options.tavlaTarget, katmerliMars: this.options.tavlaKatmerli });
       case 'pisti2': return new PistiUI(this, { players: 2, target: this.options.pistiTarget });
       case 'pisti4': return new PistiUI(this, { players: 4, target: this.options.pistiTarget });
+      case 'batak': return new BatakUI(this, { partners: this.options.batakPartners, hands: this.options.batakHands });
+      case 'king': return new KingUI(this, { short: this.options.kingShort });
     }
   }
 

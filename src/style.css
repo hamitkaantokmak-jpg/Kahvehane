@@ -504,3 +504,73 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
   .creator { align-items: stretch; justify-content: flex-end; padding: 6px; }
   .cr-panel { width: 52vw; max-height: 100%; }
 }
+
+/* ------------------------------------------------ batak ve king (el alma masası) */
+.gui.trick { padding-top: 146px; }
+.trick-table { max-height: 470px; }
+.tcenter { grid-area: ctr; align-self: center; justify-self: center; display: grid; grid-template-columns: 60px 86px 60px; grid-template-rows: 74px 50px 74px;
+  grid-template-areas: ". t ." "l i r" ". b ."; place-items: center; background: rgba(0, 0, 0, .12); border-radius: 22px; padding: 4px; }
+.tslot.bottom { grid-area: b; } .tslot.top { grid-area: t; } .tslot.left { grid-area: l; } .tslot.right { grid-area: r; }
+.tslot .card { animation: dealIn .2s ease-out; width: 50px; height: 72px; }
+.tslot .card .cs { font-size: 22px; } .tslot .card .cr { font-size: 12px; }
+.trick .pinfo { position: absolute; top: 8px; left: 8px; z-index: 2; }
+.trick .pseat .backs .card.small, .trick .pcap .card.small { width: 24px; height: 34px; }
+.trick .pcap .empty { width: 24px; height: 34px; }
+.trick .pseat .backs .card.small { margin-left: -17px; }
+.trick .pseat .backs .card.small:first-child { margin-left: 0; }
+.trick .pseat.top, .trick .pseat.bottom { gap: 10px; }
+.tslot.left .card { transform: rotate(90deg) scale(.9); } .tslot.right .card { transform: rotate(-90deg) scale(.9); }
+.tslot .card.winner { box-shadow: 0 0 0 4px var(--gold), 0 3px 0 rgba(0,0,0,.4); }
+@keyframes dealIn { from { opacity: 0; transform: translateY(-14px) scale(.8); } }
+.tinfo { grid-area: i; color: var(--paper); font-size: 12px; text-align: center; line-height: 1.25; font-weight: 700; }
+.tinfo b { color: #fff; font-size: 13px; }
+.tinfo .suit { font-size: 26px; }
+.suit.red { color: #e74c3c; } .suit.black { color: #111; text-shadow: 0 0 2px rgba(255,255,255,.6); }
+.tpanel { position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); z-index: 4; }
+.bid-panel { background: var(--paper); border: 3px solid var(--ink); border-radius: 14px; padding: 8px 10px; box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 6px; max-width: min(640px, 92vw); }
+.tp-title { font-weight: 800; font-size: 14px; text-align: center; }
+.tp-row { display: flex; flex-wrap: wrap; gap: 5px; justify-content: center; }
+.tp-row .contract { line-height: 1.15; min-width: 96px; }
+.tp-row .contract small { font-weight: 600; opacity: .75; font-size: 10px; }
+.tp-row .suit-btn .suit { font-size: 18px; }
+.ghost-dark { background: #e9dcc0; }
+.pseat.took .oplate { background: #9ff0b4; }
+.phand .card.blocked { filter: grayscale(.6) brightness(.8); opacity: .65; cursor: not-allowed; }
+.trick .phand { flex-wrap: nowrap; gap: 0; }
+.trick .phand .card { margin-left: -18px; }
+.trick .phand .card:first-child { margin-left: 0; }
+.trick .phand .card.playable:hover { z-index: 2; }
+.oplate .meta .neg, .neg { color: #c0392b; }
+.oplate .meta .pos, .pos { color: #1c7a3c; }
+.king-score { font-size: 12px; }
+.king-score td, .king-score th { padding: 2px 5px; }
+.modal .panel .king-score { max-height: 46vh; display: block; overflow-y: auto; }
+.pinfo a { color: var(--gold); }
+@media (max-width: 760px), (max-height: 520px) {
+  .game-root .gui.trick { padding-top: 54px; gap: 4px; }
+  .gui .tcenter { grid-template-columns: 40px 60px 40px; grid-template-rows: 50px 34px 50px; border-radius: 14px; }
+  .gui .tslot .card { width: 34px; height: 48px; }
+  .gui.trick .pseat .backs .card.small { width: 16px; height: 23px; margin-left: -11px; }
+  .gui.trick .pseat .backs .card.small:first-child { margin-left: 0; }
+  .gui .tslot .card .cs { font-size: 15px; }
+  .gui .tslot .card .cr { font-size: 9px; }
+  .gui .tinfo { font-size: 10px; } .gui .tinfo .suit { font-size: 18px; }
+  .gui.trick .phand .card { width: 40px; height: 58px; margin-left: -12px; }
+  .gui.trick .phand .card .cs { font-size: 17px; }
+  .gui.trick .phand .card .cr { font-size: 11px; }
+  .gui.trick .phand .card:first-child { margin-left: 0; }
+  .bid-panel { padding: 5px 6px; gap: 4px; }
+  .tp-title { font-size: 12px; }
+  .tp-row .contract { min-width: 76px; font-size: 11px; padding: 3px 6px; }
+  .gui.trick .pinfo { top: 4px; left: 4px; padding: 2px 5px; gap: 0; font-size: 9px; }
+  .gui.trick .pside { gap: 4px; }
+  .gui.trick .pside .nm { max-width: 62px; }
+  .gui.trick .pside .tot { font-size: 10px; }
+}
+@media (max-width: 520px) {
+  .game-root .gui.trick { padding-top: 104px; }
+  .gui.trick .pinfo { position: static; flex-direction: row; flex-wrap: wrap; column-gap: 8px; justify-content: center; }
+  .gui.trick .pel { width: 100%; text-align: center; }
+  .gui.trick .phand .card { width: 34px; height: 50px; margin-left: -9px; }
+  .gui.trick .phand .card .cs { font-size: 14px; }
+}

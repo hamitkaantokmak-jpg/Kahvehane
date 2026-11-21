@@ -31,7 +31,7 @@ Mobil: sol yarı sanal joystick (uzağa çekince koşar), sağ yarı kamera, ✋
 | `src/chaos` | **Saf mantık:** Kaos Direktörü (gerginlik, olay seçimi, kayıt defteri), zincirleme kavga modeli |
 | `src/economy` | **Saf mantık:** cüzdan, veresiye defteri, fiyatlar/zam, günlük bonus, iflas koruması, bahis hesabı; kalıcılık arayüzü |
 | `src/games/common` | RNG, taş seti, per doğrulama, el çözümleyici (grafikten bağımsız) |
-| `src/games/okey`, `okey101`, `tavla`, `pisti`, `dart` | Her oyunun kural motoru + ayrı bot modülü |
+| `src/games/okey`, `okey101`, `tavla`, `pisti`, `batak`, `king`, `dart` | Her oyunun kural motoru + ayrı bot modülü (`trick/`: Batak ve King'in ortak el alma çekirdeği) |
 | `src/games/atyarisi` | TV at yarışı motoru (saf, tohumlu) |
 | `src/world` | Kahvehane sahnesi, materyaller, prosedürel dokular, çarpışma + A* yol bulma |
 | `src/characters` | Modüler karakter tanımı (gelecekteki karakter oluşturucu için), model, prosedürel animatör |
@@ -52,11 +52,14 @@ npm run e2e       # Playwright uçtan uca testleri (tests/e2e) — --trace off
 ```
 Test kancaları: `?speed=N` bot beklemelerini, `?gspeed=N` oyun zamanını hızlandırır; `window.__game.session.ui` ve `ui.refresh()`.
 
-## Masa görünümü (okey, 101, tavla, pişti)
-Dört masa oyunu da aynı dili kullanır: yeşil çuha masa, **sen altta**, diğerleri kendi kenarında; sırası gelenin kenarı ve
+## Masa görünümü (okey, 101, tavla, pişti, batak, king)
+Tüm masa oyunları aynı dili kullanır: yeşil çuha masa, **sen altta**, diğerleri kendi kenarında; sırası gelenin kenarı ve
 isim plakası parlar. Yatay telefonda ıstaka/el bir yanda, durum ve düğmeler öbür yanda durur.
 - **Pişti:** herkesin elindeki kart sayısı kendi kenarında; aldığın kartlar kapalı yığın olarak önünde (kart, puan ve pişti
   puanı yazar), karşı tarafınki rakibin önünde. Ortada deste ve yerdeki kartlar, köşede küçük skor tabelası.
+- **Batak ve King:** ortaya oynanan her kart oynayanın önüne düşer; el bitince kimin aldığı bir an görünür. Elinde yalnızca
+  oynayabileceğin kartlar parlar (soluk karta basınca nedenini söyler). İhale/koz/oyun seçimi masanın ortasında açılır;
+  King'de köşedeki "tablo" bağlantısı oynanan elleri ve kalan cezaları gösterir.
 - **Tavla:** rakip tahtanın karşısında, sen altta (pul rengi, pip ve maç skoru plakada). Zarlar tahtanın ortasında, atanın
   sağ yarısına düşer; toplanan pullar tahtanın yanındaki kutularda yığılır (üstte rakibin, altta senin). Pullar hane
   yüksekliğine göre küçülür, dar ekranda üst üste taşmaz.
@@ -118,6 +121,18 @@ Puan: kazanan −101; elden bitme ×2, okey atarak bitme ×2; açmayan +202×ça
 **Katlamalı 101 (seçenek, "yükselen açış"):** aynı elde her yeni seri açış o ana kadarki en yüksek seri açıştan en az 1 fazla,
 her yeni çift açış en çok çiftle açılandan en az 1 çift fazla olmalıdır. Puanlama standart 101 ile aynıdır.
 (Katlamalı 101'in bölgeden bölgeye farklı yorumları vardır; burada yükselen açış eşiği uygulanmıştır.)
+
+**İhaleli Batak (tekli / eşli):** 52 kart, 13'er. Dağıtanın solundan ihale: en az 5 (eşlide 7), en çok 13; pas diyen o elde
+ihaleye dönmez, üç pas ihaleyi bitirir, herkes pas derse son kalan en az ihaleyle almak zorunda. İhaleyi alan kozu seçer ve açar.
+Renge uymak zorunlu; o renkten eli alabiliyorsan yükseltmek zorunlu (ortaya koz düşmüşse gerekmez). Rengin yoksa koz atmak
+zorunlu, ortada koz varsa geçebiliyorsan büyük koz. Koz açılmadan kozla açılmaz (elde yalnızca koz yoksa). Puan: tutan aldığı
+el kadar, batan ihale kadar eksi, diğerleri aldıkları el kadar; eşlide ortakların elleri birlikte sayılır. 3/5/7/11 el.
+
+**King:** 4 kişi, 13'er kart. Seçen sırayla değişir ve açar. Tam King 20 el (her oyuncu 2 koz + 3 ceza, her ceza en çok 2 kez),
+Kısa King 8 el (1 koz + 1 ceza, her ceza en çok 1 kez). Cezalar: el almaz −50/el, kupa almaz −30/kupa, erkek almaz −60/papaz ve vale,
+kız almaz −100/kız, rıfkı −320 (kupa papazı), son iki −180/el. Koz: seçen kozu belirler, +50/el. Renge uymak zorunlu; rengin yoksa
+kozda koz zorunlu, rıfkıda kupa papazı elindeyse onu atmak zorunlu. Kozda koz, kupa almaz ve rıfkıda kupa açılmadan o renkle
+açılmaz. Ceza elleri cezanın tamamı alınınca erken biter. En yüksek toplam kazanır.
 
 **Tavla:** 24 hane, 15'er pul, standart diziliş. Açılışta büyük zar atan başlar ve zarları yeniden atar. Azami zar
 kullanımı ve "tek zar oynanabiliyorsa büyüğü" kuralı, kırma/bar, kapalı hane, toplama (büyük zarla en gerideki).

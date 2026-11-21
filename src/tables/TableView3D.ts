@@ -266,6 +266,14 @@ export interface PistiView3D {
   capturedIds: Card[][];
 }
 
+export interface TrickView3D {
+  hand: Card[]; // insanın eli
+  handCounts: number[];
+  trick: { player: number; card: Card }[];
+  /** oyuncu başına alınan el sayısı */
+  won: number[];
+}
+
 /** Masa üstü 3D görünümü (bir masa oturumu için). */
 export class TableView3D {
   private group: THREE.Group;
@@ -333,7 +341,7 @@ export class TableView3D {
       }
     } else if (kind === 'pisti') {
       const a = getCardAtlas();
-      this.cards = new PieceLayer(pieceGeometry('card3d', 0.062, 0.088, 0.0025), atlasMaterial(a, 52, 53), 60, a);
+      this.cards = new PieceLayer(pieceGeometry('card3d', 0.062, 0.088, 0.0025), atlasMaterial(a, 52, 53), 80, a);
       this.group.add(this.cards.mesh);
     } else {
       this.checkers = new PieceLayer(sharedGeo('checker3d', () => new THREE.CylinderGeometry(0.019, 0.019, 0.009, 18)), new THREE.MeshToonMaterial({ color: 0xffffff }), 32, null);
@@ -522,6 +530,36 @@ export class TableView3D {
       const fr = this.frame(side, v.players);
       const base = fr.toward.clone().multiplyScalar(0.25).add(fr.right.clone().multiplyScalar(0.3));
       v.capturedIds[side].forEach((c, i) => L.place(`c${c.id}`, base.clone().setY(TOP + 0.002 + Math.min(i, 40) * 0.0012), down(fr.yaw + (hash(c.id) - 0.5) * 0.3), cellOf(c)));
+    }
+    L.endFrame();
+  }
+
+  /** El alma oyunları (Batak, King): eller, ortadaki el, alınan eller */
+  syncTrick(v: TrickView3D) {
+    this.setup('pisti', 4);
+    const L = this.cards!;
+    L.beginFrame();
+    const cellOf = (c: Card) => c.suit * 13 + (c.rank - 1);
+    const up = (yaw: number) => Q(-Math.PI / 2, yaw, 0);
+    const down = (yaw: number) => Q(Math.PI / 2, yaw, 0);
+    const spawn = new THREE.Vector3(0, TOP + 0.12, 0);
+    for (let p = 0; p < 4; p++) {
+      const fr = this.frame(p, 4);
+      const n = p === 0 ? v.hand.length : v.handCounts[p];
+      for (let k = 0; k < n; k++) {
+        const pos = fr.toward.clone().multiplyScalar(0.33).add(fr.right.clone().multiplyScalar((k - (n - 1) / 2) * 0.045)).setY(TOP + 0.002 + k * 0.0004);
+        if (p === 0) { const c = v.hand[k]; L.place(`c${c.id}`, pos, up(fr.yaw), cellOf(c), undefined, spawn); }
+        else L.place(`h${p}:${k}`, pos, down(fr.yaw), undefined, undefined, spawn);
+      }
+      // alınan eller: oyuncunun sağında kapalı küçük deste
+      const base = fr.toward.clone().multiplyScalar(0.24).add(fr.right.clone().multiplyScalar(0.3));
+      for (let k = 0; k < v.won[p]; k++) L.place(`w${p}:${k}`, base.clone().setY(TOP + 0.002 + k * 0.004), down(fr.yaw + (k % 2 ? 0.08 : -0.06)));
+    }
+    // ortadaki el: her kart oynayanın önünde
+    for (const t of v.trick) {
+      const fr = this.frame(t.player, 4);
+      const pos = fr.toward.clone().multiplyScalar(0.1).setY(TOP + 0.003);
+      L.place(`c${t.card.id}`, pos, up(fr.yaw + (hash(t.card.id) - 0.5) * 0.3), cellOf(t.card), undefined, spawn);
     }
     L.endFrame();
   }

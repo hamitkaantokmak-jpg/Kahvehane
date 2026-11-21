@@ -137,6 +137,13 @@ describe('Bahis hesapları', () => {
     expect(B.pistiOutcome([50, 50], 4)).toBe(null);
   });
 
+  it('batak ve king: en düşük toplam öder, en yüksek alır; eşli batakta ortaklar birlikte', () => {
+    expect(B.kingOutcome([650, -320, -1200, 100])).toEqual({ payers: [2], winners: [0], multiplier: 1 });
+    expect(B.batakOutcome([12, 5, 3, 9])).toEqual({ payers: [2], winners: [0], multiplier: 1 });
+    expect(B.batakOutcome([14, -7, 14, -7])).toEqual({ payers: [1, 3], winners: [0, 2], multiplier: 1 });
+    expect(B.kingOutcome([0, 0, 0, 0])).toBe(null);
+  });
+
   it('bahis yoksa transfer yok', () => {
     expect(B.settle(B.okeyOutcome([20, 2, 14, 10]), 0, ids4)).toEqual([]);
   });
