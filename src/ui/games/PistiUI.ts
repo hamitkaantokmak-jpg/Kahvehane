@@ -39,7 +39,12 @@ export class PistiUI implements GameUI {
     this.status = h('div', 'status');
     this.handEl = h('div', 'phand');
     this.btns = h('div', 'gbtns');
-    this.el.append(this.info, this.table, this.status, this.handEl, this.btns);
+    // alt bölüm: el + durum + düğmeler (yatay telefonda el solda, durum ve düğmeler sağda)
+    const dock = h('div', 'odock');
+    const side = h('div', 'oside');
+    side.append(this.status, this.btns);
+    dock.append(this.handEl, side);
+    this.el.append(this.table, dock);
     this.host.sfx('deal');
     this.render();
     this.pump();
@@ -107,25 +112,57 @@ export class PistiUI implements GameUI {
     this.host.table3d.syncPisti({ players: this.opts.players, hands: [s.hands[0]], handCounts: s.hands.map((x) => x.length), pile: s.pile, hiddenCount: s.hiddenCount, deckCount: s.deck.length, captured: s.captured.map((c) => c.length), capturedIds: s.captured });
   }
 
+  /** Masa görünümü: yeşil çuha, herkes kendi kenarında; aldığı kartlar önünde yığılır, deste ve yerdeki kartlar ortada. */
   private render(capturedBy?: number) {
     this.sync3d();
     const s = this.s;
     const n = this.host.names;
     const t = P.tally(s);
+    const four = this.opts.players === 4;
+    const live = s.phase === 'play';
+    // köşedeki skor tabelası
     this.info.innerHTML = [0, 1].map((side) =>
-      `<div class="pside${this.side(0) === side ? ' me' : ''}"><div class="nm">${this.sideName(side)}</div><div>Kart: <b>${t[side].cards}</b> · Pişti: <b>${t[side].pistiPoints}</b> · Puan: <b>${t[side].points}</b></div><div class="tot">Toplam: <b>${s.totals[side]}</b> / ${s.options.target}</div></div>`,
-    ).join('') + `<div class="pdeck">Deste: <b>${s.deck.length}</b><br>El ${s.handNo}</div>`;
-    // masa: rakiplerin elleri + ortadaki yığın
+      `<div class="pside${this.side(0) === side ? ' me' : ''}"><span class="nm">${this.sideName(side)}</span><b class="tot">${s.totals[side]}</b><span class="of">/${s.options.target}</span></div>`,
+    ).join('') + `<div class="pel">El ${s.handNo}</div>`;
     this.table.innerHTML = '';
-    const positions = this.opts.players === 2 ? [[1, 'top']] : [[1, 'right'], [2, 'top'], [3, 'left']];
-    for (const [pi, pos] of positions as [number, string][]) {
-      const o = h('div', `popp ${pos}${s.current === pi && s.phase === 'play' ? ' turn' : ''}${this.opts.players === 4 && this.side(pi) === 0 ? ' partner' : ''}`);
-      o.appendChild(h('div', 'nm', n[pi] + (this.opts.players === 4 && this.side(pi) === 0 ? ' (ortak)' : '')));
-      const cards = h('div', 'backs');
-      for (let k = 0; k < s.hands[pi].length; k++) cards.appendChild(cardEl(null, { back: true, small: true }));
-      o.appendChild(cards);
-      this.table.appendChild(o);
+    this.table.appendChild(this.info);
+    // aldığı kartlar: kapalı yığın + sayı (+ pişti puanı)
+    const capEl = (side: number) => {
+      const c = h('div', `pcap${capturedBy !== undefined && this.side(capturedBy) === side ? ' fresh' : ''}`);
+      const stack = h('div', 'pcap-stack');
+      const k = Math.min(4, Math.ceil(t[side].cards / 4));
+      for (let i = 0; i < k; i++) { const ce = cardEl(null, { back: true, small: true }); ce.style.setProperty('--i', String(i)); stack.appendChild(ce); }
+      if (!k) stack.appendChild(h('div', 'empty'));
+      c.appendChild(stack);
+      c.appendChild(h('div', 'pl', `${t[side].cards} kart · ${t[side].points} puan${t[side].pistiPoints ? ` · <b>pişti ${t[side].pistiPoints}</b>` : ''}`));
+      return c;
+    };
+    const plate = (pi: number) => {
+      const partner = four && pi !== 0 && this.side(pi) === 0;
+      const d = h('div', `oplate${s.current === pi && live ? ' turn' : ''}${partner ? ' opened' : ''}`);
+      d.innerHTML = `<span class="nm">${pi === 0 ? 'Sen' : n[pi]}</span><span class="cnt" title="Eldeki kart">${s.hands[pi].length}</span>${partner ? '<span class="meta">ortak</span>' : ''}`;
+      return d;
+    };
+    const seats: [number, string][] = four ? [[1, 'right'], [2, 'top'], [3, 'left']] : [[1, 'top']];
+    // takımın aldığı kartlar: kendi tarafın altta, karşı tarafınki sağdaki (2 kişide karşıdaki) rakibin önünde
+    const capHolder = (pi: number) => pi === 0 || pi === 1;
+    for (const [pi, pos] of seats) {
+      const z = h('div', `pseat ${pos}${s.current === pi && live ? ' turn' : ''}`);
+      const who = h('div', 'pwho');
+      who.appendChild(plate(pi));
+      const backs = h('div', 'backs');
+      for (let k = 0; k < s.hands[pi].length; k++) backs.appendChild(cardEl(null, { back: true, small: true }));
+      who.appendChild(backs);
+      z.appendChild(who);
+      if (capHolder(pi)) z.appendChild(capEl(this.side(pi)));
+      this.table.appendChild(z);
     }
+    // orta: deste + yerdeki kartlar
+    const center = h('div', 'pcenter');
+    const deck = h('div', 'pdeck');
+    if (s.deck.length) deck.appendChild(cardEl(null, { back: true }));
+    else deck.appendChild(h('div', 'empty'));
+    deck.appendChild(h('div', 'pl', `Deste ${s.deck.length}`));
     const pile = h('div', `pile-center${capturedBy !== undefined ? ' captured' : ''}`);
     if (s.pile.length) {
       const visible = s.pile.slice(-4);
@@ -136,8 +173,12 @@ export class PistiUI implements GameUI {
         pile.appendChild(ce);
       });
       pile.appendChild(h('div', 'pcount', `${s.pile.length} kart`));
-    } else pile.appendChild(h('div', 'empty', capturedBy !== undefined ? `${n[capturedBy]} aldı!` : 'Yer boş'));
-    this.table.appendChild(pile);
+    } else pile.appendChild(h('div', 'empty', capturedBy !== undefined ? `${capturedBy === 0 ? 'Sen' : n[capturedBy]} aldı!` : 'Yer boş'));
+    center.append(deck, pile);
+    this.table.appendChild(center);
+    const me = h('div', `pseat bottom${s.current === 0 && live ? ' turn' : ''}`);
+    me.append(capEl(this.side(0)), plate(0));
+    this.table.appendChild(me);
     // benim elim
     this.handEl.innerHTML = '';
     const top = s.pile[s.pile.length - 1];

@@ -52,7 +52,16 @@ npm run e2e       # Playwright uçtan uca testleri (tests/e2e) — --trace off
 ```
 Test kancaları: `?speed=N` bot beklemelerini, `?gspeed=N` oyun zamanını hızlandırır; `window.__game.session.ui` ve `ui.refresh()`.
 
-## Okey masası (masaya odaklı görünüm)
+## Masa görünümü (okey, 101, tavla, pişti)
+Dört masa oyunu da aynı dili kullanır: yeşil çuha masa, **sen altta**, diğerleri kendi kenarında; sırası gelenin kenarı ve
+isim plakası parlar. Yatay telefonda ıstaka/el bir yanda, durum ve düğmeler öbür yanda durur.
+- **Pişti:** herkesin elindeki kart sayısı kendi kenarında; aldığın kartlar kapalı yığın olarak önünde (kart, puan ve pişti
+  puanı yazar), karşı tarafınki rakibin önünde. Ortada deste ve yerdeki kartlar, köşede küçük skor tabelası.
+- **Tavla:** rakip tahtanın karşısında, sen altta (pul rengi, pip ve maç skoru plakada). Zarlar tahtanın ortasında, atanın
+  sağ yarısına düşer; toplanan pullar tahtanın yanındaki kutularda yığılır (üstte rakibin, altta senin). Pullar hane
+  yüksekliğine göre küçülür, dar ekranda üst üste taşmaz.
+
+### Okey masası
 Klasik Okey ve 101, yukarıdan bakılan yeşil çuha bir masada oynanır (`src/ui/games/OkeyTable.ts`, yalnızca çizim):
 - Her oyuncu kendi kenarında: **sen altta**, sağında 1, karşında 2, solunda 3; sıra sağdan döner (0 → 1 → 2 → 3).
   Sırası gelen oyuncunun kenarı ve isim plakası parlar.
