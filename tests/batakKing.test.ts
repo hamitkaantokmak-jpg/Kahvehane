@@ -110,6 +110,22 @@ describe('Batak', () => {
     expect(B.scoreHand([2, 5, 3, 3], 2, 7, true)).toEqual({ scores: [-7, 8, -7, 8], made: false });
   });
 
+  it('el almayan cezalı: ihaleyi almayanlardan hiç el alamayan ihale kadar kaybeder; ihaleci tarafa ayrıca uygulanmaz', () => {
+    expect(B.scoreHand([7, 6, 0, 0], 0, 6, false, true)).toEqual({ scores: [7, 6, -6, -6], made: true });
+    expect(B.scoreHand([0, 7, 6, 0], 0, 5, false, true)).toEqual({ scores: [-5, 7, 6, -5], made: false });
+    expect(B.scoreHand([7, 6, 0, 0], 0, 6, false, false).scores).toEqual([7, 6, 0, 0]); // seçenek kapalı
+    // eşli: takım olarak hiç el almayan cezalı
+    expect(B.scoreHand([7, 0, 6, 0], 0, 8, true, true)).toEqual({ scores: [13, -8, 13, -8], made: true });
+    expect(B.scoreHand([7, 1, 5, 0], 0, 8, true, true)).toEqual({ scores: [12, 1, 12, 1], made: true });
+  });
+
+  it('el almayan cezalı açıkken botlar maçları geçerli hamlelerle bitirir', () => {
+    for (let seed = 50; seed <= 70; seed++) {
+      const s = playBatakMatch(seed, { partners: seed % 2 === 0, hands: 2, zeroPenalty: true });
+      expect(s.phase).toBe('matchOver');
+    }
+  });
+
   it('botlar tekli ve eşli maçları yalnızca geçerli hamlelerle bitirir; her elde 13 el dağıtılır', () => {
     for (let seed = 1; seed <= 40; seed++) {
       const partners = seed % 2 === 0;

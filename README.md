@@ -127,6 +127,8 @@ ihaleye dönmez, üç pas ihaleyi bitirir, herkes pas derse son kalan en az ihal
 Renge uymak zorunlu; o renkten eli alabiliyorsan yükseltmek zorunlu (ortaya koz düşmüşse gerekmez). Rengin yoksa koz atmak
 zorunlu, ortada koz varsa geçebiliyorsan büyük koz. Koz açılmadan kozla açılmaz (elde yalnızca koz yoksa). Puan: tutan aldığı
 el kadar, batan ihale kadar eksi, diğerleri aldıkları el kadar; eşlide ortakların elleri birlikte sayılır. 3/5/7/11 el.
+Seçenek **El almayan cezalı**: ihaleyi almayanlardan hiç el alamayan ihale kadar kaybeder (eşlide hiç el alamayan takım);
+ihaleyi alan taraf zaten batmış sayılır, ona ayrıca uygulanmaz.
 
 **King:** 4 kişi, 13'er kart. Seçen sırayla değişir ve açar. Tam King 20 el (her oyuncu 2 koz + 3 ceza, her ceza en çok 2 kez),
 Kısa King 8 el (1 koz + 1 ceza, her ceza en çok 1 kez). Cezalar: el almaz −50/el, kupa almaz −30/kupa, erkek almaz −60/papaz ve vale,

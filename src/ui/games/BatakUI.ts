@@ -165,12 +165,14 @@ export class BatakUI extends TrickUI {
     const m = h('div', 'modal');
     const over = s.phase === 'matchOver';
     const winners = B.matchWinners(s);
-    const rows = [0, 1, 2, 3].map((p) => `<tr class="${p === 0 ? 'me' : ''}${p === bidder ? ' win' : ''}"><td>${names[p]}${p === bidder ? ` <small>(ihale ${s.highBid})</small>` : ''}</td><td>${s.tricksWon[p]}</td><td>${s.handScores![p] > 0 ? '+' : ''}${s.handScores![p]}</td><td><b>${s.totals[p]}</b></td></tr>`).join('');
+    const zero = (p: number) => !!this.opts.zeroPenalty && B.teamOf(s, p) !== B.teamOf(s, bidder) && s.handScores![p] < 0;
+    for (let p = 1; p < 4; p++) if (zero(p)) this.host.react(p, 'lose', 'Hiç el alamadım...');
+    const rows = [0, 1, 2, 3].map((p) => `<tr class="${p === 0 ? 'me' : ''}${p === bidder ? ' win' : ''}"><td>${names[p]}${p === bidder ? ` <small>(ihale ${s.highBid})</small>` : ''}${zero(p) ? ' <small>(el almadı)</small>' : ''}</td><td>${s.tricksWon[p]}</td><td>${s.handScores![p] > 0 ? '+' : ''}${s.handScores![p]}</td><td><b>${s.totals[p]}</b></td></tr>`).join('');
     const title = s.made ? `${names[bidder]} ihaleyi tutturdu (${s.highBid})` : `${names[bidder]} battı! (${s.highBid} ihale)`;
     const mine = winners.includes(0);
     m.innerHTML = `<div class="panel"><h3>${title}</h3>
       <table class="score"><tr><th></th><th>El</th><th>Bu el</th><th>Toplam</th></tr>${rows}</table>
-      <p class="muted">El ${s.handNo}/${this.opts.hands}. Koz: ${SUIT_TR[s.trump!]}.${this.opts.partners ? ' Eşli: ortakların elleri birlikte sayılır.' : ''}</p>
+      <p class="muted">El ${s.handNo}/${this.opts.hands}. Koz: ${SUIT_TR[s.trump!]}.${this.opts.partners ? ' Eşli: ortakların elleri birlikte sayılır.' : ''}${this.opts.zeroPenalty ? ' El almayan cezalı: hiç el alamayan ihale kadar kaybeder.' : ''}</p>
       ${over ? `<h3>${mine ? '🏆 Maçı KAZANDIN!' : `🏆 Maçı ${winners.map((w) => names[w]).join(' & ')} kazandı`}</h3>` : ''}</div>`;
     const row = h('div', 'row-btns');
     if (!over) row.appendChild(btn('Sonraki el ▶', 'primary', () => { m.remove(); B.nextHand(s, this.rng); this.host.sfx('deal'); this.render(); this.pump(); }));

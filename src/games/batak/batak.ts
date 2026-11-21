@@ -12,6 +12,8 @@
  * - Koz "açılmadan" (biri renk tutamayıp koz atmadan) kozla el açılamaz; elinde yalnızca koz kaldıysa açabilirsin.
  * - Puan: ihaleyi tutturan aldığı el sayısı kadar alır, tutturamayan (batan) ihale kadar kaybeder;
  *   diğerleri aldıkları el sayısı kadar alır. Eşlide eşlerin elleri birlikte sayılır, puan iki eşe de yazılır.
+ * - Seçenek "el almayan cezalı": ihaleyi almayanlardan hiç el alamayan ihale kadar kaybeder
+ *   (eşlide hiç el alamayan takım). İhaleyi alan taraf zaten batmış sayılır, ona ayrıca uygulanmaz.
  * - Maç: seçilen el sayısı oynanır, toplamı en yüksek olan (eşlide takım) kazanır.
  */
 import { Rng } from '../common/rng';
@@ -22,6 +24,8 @@ export interface BatakOptions {
   partners: boolean;
   /** Maçtaki el sayısı */
   hands: number;
+  /** Hiç el almayan (ihaleyi almayan taraftan) ihale kadar kaybeder */
+  zeroPenalty?: boolean;
 }
 
 export type BatakPhase = 'bid' | 'trump' | 'play' | 'handOver' | 'matchOver';
@@ -187,20 +191,21 @@ export function playCard(s: BatakState, p: number, cardId: number): PlayResult {
 }
 
 /** El puanı: saf hesap (test edilebilir) */
-export function scoreHand(tricks: number[], bidder: number, bidAmount: number, partners: boolean): { scores: number[]; made: boolean } {
+export function scoreHand(tricks: number[], bidder: number, bidAmount: number, partners: boolean, zeroPenalty = false): { scores: number[]; made: boolean } {
   const team = (p: number) => (partners ? p % 2 : p);
   const teamTricks = (t: number) => tricks.reduce((a, n, p) => a + (team(p) === t ? n : 0), 0);
   const made = teamTricks(team(bidder)) >= bidAmount;
   const scores = [0, 1, 2, 3].map((p) => {
     const own = partners ? teamTricks(team(p)) : tricks[p];
     if (team(p) === team(bidder)) return made ? own : -bidAmount;
+    if (zeroPenalty && own === 0) return -bidAmount; // hiç el alamadı
     return own;
   });
   return { scores, made };
 }
 
 function endHand(s: BatakState) {
-  const r = scoreHand(s.tricksWon, s.bidder!, s.highBid, s.options.partners);
+  const r = scoreHand(s.tricksWon, s.bidder!, s.highBid, s.options.partners, !!s.options.zeroPenalty);
   s.handScores = r.scores;
   s.made = r.made;
   s.totals = s.totals.map((t, i) => t + r.scores[i]);
@@ -231,6 +236,7 @@ export interface BatakView {
   legal: Card[];
   legalBids: Bid[];
   min: number;
+  zeroPenalty: boolean;
 }
 
 export function viewBatak(s: BatakState, p: number): BatakView {
@@ -238,5 +244,6 @@ export function viewBatak(s: BatakState, p: number): BatakView {
     me: p, hand: [...s.hands[p]], partners: s.options.partners, phase: s.phase, bids: [...s.bids], highBid: s.highBid,
     bidder: s.bidder, trump: s.trump, trumpBroken: s.trumpBroken, trick: [...s.trick], tricksWon: [...s.tricksWon],
     handSizes: s.hands.map((h) => h.length), played: [...s.played], legal: legalCards(s, p), legalBids: legalBids(s, p), min: minBid(s.options),
+    zeroPenalty: !!s.options.zeroPenalty,
   };
 }
