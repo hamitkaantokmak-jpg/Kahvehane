@@ -271,7 +271,8 @@ export class Social {
     return true;
   }
 
-  private launch(from: Character, to: Character, onHit: () => void) {
+  /** Görsel çay fırlatma (çevrimiçi masada da kullanılır; para ve bekleme yok) */
+  launch(from: Character, to: Character, onHit: () => void) {
     from.faceTowards(to.pos);
     from.anim.play('swing');
     sfx.play('whoosh');

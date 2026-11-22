@@ -16,10 +16,10 @@ const REACT_LINES: Partial<Record<K.Contract, string[]>> = {
 
 export class KingUI extends TrickUI {
   s: K.KingState;
-  private rng = createRng();
+  protected rng = createRng();
   private scoreOpen = false;
 
-  constructor(host: GameHost, private opts: K.KingOptions) {
+  constructor(host: GameHost, protected opts: K.KingOptions) {
     super(host, 'king');
     this.s = K.newKing(opts, this.rng, 0);
     this.host.sfx('deal');
@@ -170,12 +170,12 @@ export class KingUI extends TrickUI {
     this.after(r.trickDone);
   }
 
-  private doContract(c: K.Contract) {
+  protected doContract(c: K.Contract) {
     try { K.chooseContract(this.s, 0, c); this.host.sfx('click'); } catch (e) { this.host.toast((e as Error).message); return; }
     this.after();
   }
 
-  private doTrump(su: Suit) {
+  protected doTrump(su: Suit) {
     try { K.chooseTrump(this.s, 0, su); this.host.sfx('card'); } catch (e) { this.host.toast((e as Error).message); return; }
     this.after();
   }
@@ -186,6 +186,10 @@ export class KingUI extends TrickUI {
     this.host.sfx('card');
     this.onTrick(r);
   }
+
+  protected newMatchLabel = 'Yeni maç';
+  protected onNextHand() { K.nextHand(this.s, this.rng); this.host.sfx('deal'); this.render(); this.pump(); }
+  protected onNewMatch() { this.s = K.newKing(this.opts, this.rng, 0); this.host.sfx('deal'); this.render(); this.pump(); }
 
   protected handOver() { return this.s.phase === 'handOver' || this.s.phase === 'matchOver'; }
 
@@ -225,10 +229,10 @@ export class KingUI extends TrickUI {
       ${this.tableHtml()}
       ${over ? `<h3>${mine ? '🏆 King\'i KAZANDIN!' : `🏆 King'i ${winners.map((w) => names[w]).join(' & ')} kazandı`}</h3>` : ''}</div>`;
     const row = h('div', 'row-btns');
-    if (!over) row.appendChild(btn('Sonraki el ▶', 'primary', () => { m.remove(); K.nextHand(s, this.rng); this.host.sfx('deal'); this.render(); this.pump(); }));
+    if (!over) row.appendChild(btn('Sonraki el ▶', 'primary', () => { m.remove(); this.onNextHand(); }));
     else {
       this.host.matchFinished(mine);
-      row.appendChild(btn('Yeni maç', 'primary', () => { m.remove(); this.s = K.newKing(this.opts, this.rng, 0); this.host.sfx('deal'); this.render(); this.pump(); }));
+      row.appendChild(btn(this.newMatchLabel, 'primary', () => { m.remove(); this.onNewMatch(); }));
     }
     row.appendChild(btn('Masadan kalk', 'ghost', () => this.host.exit()));
     m.querySelector('.panel')!.appendChild(row);

@@ -21,17 +21,17 @@ export function cardEl(c: P.Card | null, opts: { back?: boolean; small?: boolean
 export class PistiUI implements GameUI {
   readonly el: HTMLDivElement;
   s: P.PistiState;
-  private rng = createRng();
-  private alive = true;
-  private timer = 0;
+  protected rng = createRng();
+  protected alive = true;
+  protected timer = 0;
   private table!: HTMLDivElement;
   private handEl!: HTMLDivElement;
   private info!: HTMLDivElement;
   private status!: HTMLDivElement;
   private btns!: HTMLDivElement;
-  private busy = false;
+  protected busy = false;
 
-  constructor(private host: GameHost, private opts: P.PistiOptions) {
+  constructor(protected host: GameHost, protected opts: P.PistiOptions) {
     this.el = h('div', `gui pisti p${opts.players}`);
     this.s = P.newPisti(opts, this.rng);
     this.info = h('div', 'pinfo');
@@ -68,7 +68,7 @@ export class PistiUI implements GameUI {
     return side === 0 ? `Sen & ${n[2]}` : `${n[1]} & ${n[3]}`;
   }
 
-  private pump() {
+  protected pump() {
     if (!this.alive || this.s.phase !== 'play' || this.host.isHuman(this.s.current)) return;
     // masadan kalkan (kavgadaki) oyuncu varsa bot sırası bekler
     if (this.host.paused) { clearTimeout(this.timer); this.timer = later(() => this.pump(), 600); return; }
@@ -77,7 +77,7 @@ export class PistiUI implements GameUI {
     this.timer = later(() => this.play(p, choosePistiCard(P.viewPisti(this.s, p), this.rng, this.host.difficulty)), 750 + Math.random() * 500);
   }
 
-  private play(p: number, cardId: number) {
+  protected play(p: number, cardId: number) {
     if (!this.alive || this.s.phase !== 'play' || this.busy) return;
     if (this.s.current !== p || !this.s.hands[p].some((c) => c.id === cardId)) { this.pump(); return; }
     const s = this.s;
@@ -101,7 +101,7 @@ export class PistiUI implements GameUI {
     this.pump();
   }
 
-  private splash(text: string) {
+  protected splash(text: string) {
     const d = h('div', 'splash', text);
     this.el.appendChild(d);
     setTimeout(() => d.remove(), 1600);
@@ -113,7 +113,7 @@ export class PistiUI implements GameUI {
   }
 
   /** Masa görünümü: yeşil çuha, herkes kendi kenarında; aldığı kartlar önünde yığılır, deste ve yerdeki kartlar ortada. */
-  private render(capturedBy?: number) {
+  protected render(capturedBy?: number) {
     this.sync3d();
     const s = this.s;
     const n = this.host.names;
@@ -197,7 +197,11 @@ export class PistiUI implements GameUI {
     this.btns.appendChild(btn('Kalk', 'ghost small', () => this.host.exit()));
   }
 
-  private onHandEnd() {
+  protected newMatchLabel = 'Yeni maç';
+  protected onNextHand() { P.nextHand(this.s, this.rng); this.host.sfx('deal'); this.host.table3d.clear(); this.render(); this.pump(); }
+  protected onNewMatch() { this.s = P.newPisti(this.opts, this.rng); this.host.table3d.clear(); this.render(); this.pump(); }
+
+  protected onHandEnd() {
     const s = this.s;
     const t = P.tally(s);
     const sc = s.handScores!;
@@ -212,10 +216,10 @@ export class PistiUI implements GameUI {
       </table><p class="muted">${majority}. As/Vale 1, ♣2 = 2, ♦10 = 3, pişti 10, vale piştisi 20.</p>
       ${over ? `<h3>${winSide === mySide ? '🏆 Maçı KAZANDINIZ!' : `🏆 Maçı ${this.sideName(winSide)} kazandı`}</h3>` : ''}</div>`;
     const row = h('div', 'row-btns');
-    if (!over) row.appendChild(btn('Sonraki el ▶', 'primary', () => { m.remove(); P.nextHand(s, this.rng); this.host.sfx('deal'); this.host.table3d.clear(); this.render(); this.pump(); }));
+    if (!over) row.appendChild(btn('Sonraki el ▶', 'primary', () => { m.remove(); this.onNextHand(); }));
     else {
       this.host.matchFinished(winSide === mySide);
-      row.appendChild(btn('Yeni maç', 'primary', () => { m.remove(); this.s = P.newPisti(this.opts, this.rng); this.host.table3d.clear(); this.render(); this.pump(); }));
+      row.appendChild(btn(this.newMatchLabel, 'primary', () => { m.remove(); this.onNewMatch(); }));
     }
     row.appendChild(btn('Masadan kalk', 'ghost', () => this.host.exit()));
     m.querySelector('.panel')!.appendChild(row);

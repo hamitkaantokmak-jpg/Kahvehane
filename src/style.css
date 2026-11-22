@@ -574,3 +574,37 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
   .gui.trick .phand .card { width: 34px; height: 50px; margin-left: -9px; }
   .gui.trick .phand .card .cs { font-size: 14px; }
 }
+
+/* ------------------------------------------------ çevrimiçi */
+.online-entry { margin-top: 8px; padding: 8px 10px; border: 3px dashed #2f8f4e; border-radius: 14px; background: #eafbea; }
+.online-row { display: flex; gap: 6px; align-items: center; flex-wrap: wrap; margin-top: 6px; }
+.code-input { width: 74px; font: inherit; font-weight: 900; letter-spacing: 3px; text-align: center; padding: 4px 6px; border: 3px solid var(--ink); border-radius: 10px; text-transform: uppercase; }
+.online-panel { max-width: min(560px, 96vw); }
+.room-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; }
+.room-code { font-size: 34px; font-weight: 900; letter-spacing: 6px; color: var(--red); line-height: 1; }
+.online-seats { display: grid; grid-template-columns: 1fr 1fr; gap: 6px; margin: 8px 0; }
+.oseat { border: 2px solid var(--ink); border-radius: 10px; padding: 5px 8px; background: #fff; display: flex; flex-direction: column; gap: 3px; }
+.oseat.me { background: #d9f5df; }
+.oseat.away { opacity: .6; }
+.oseat .nm { font-weight: 800; }
+.oseat .meta { font-size: 11px; color: #6b3a1c; }
+.online-games { display: flex; gap: 5px; flex-wrap: wrap; margin: 4px 0 6px; }
+.online-opts { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; margin-bottom: 6px; }
+.small { font-size: 12px; }
+.online-status { position: absolute; top: 60px; left: 50%; transform: translateX(-50%); background: var(--gold); border: 3px solid var(--ink); border-radius: 12px; padding: 3px 12px; font-weight: 800; z-index: 30; }
+.online-status:empty { display: none; }
+.online-chaos { position: absolute; top: 112px; left: 12px; z-index: 26; display: flex; gap: 5px; flex-wrap: wrap; max-width: 46vw; }
+.taunt-pick { max-height: 50vh; overflow-y: auto; }
+@media (max-width: 760px), (max-height: 520px) {
+  .game-root .online-chaos { top: 12px; left: 182px; gap: 3px; }
+  .online-chaos button { padding: 4px 7px; }
+  .online-chaos .lb { display: none; }
+  .room-code { font-size: 26px; }
+  .online-seats { grid-template-columns: 1fr 1fr; }
+}
+@media (max-width: 520px) {
+  .game-root .online-chaos { top: 58px; left: 12px; }
+}
+
+/* çevrimiçi masada yerel gerginlik çubuğu gizli (kaos düğmelerine yer) */
+body.online-mode .tension { display: none; }
