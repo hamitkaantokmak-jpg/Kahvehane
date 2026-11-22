@@ -37,6 +37,18 @@ import { LocalEconomyStore } from '../economy/store';
 import { WORK_PAY, dayNumber } from '../economy/Economy';
 import { stainIntensity, isStained } from '../interactions/teaThrow';
 
+/**
+ * Masaya oturunca kamera: oyuncunun arkasından ve yukarıdan masaya bakış. Kamera yandaki koltuklara fazla yakın olursa
+ * komşuların kafaları ekranın üstünü kaplar; bu yüzden yeterince geride ve yüksekte durur (karşıdakiler görünür kalır).
+ */
+export function seatCamera(seat: Seat): [THREE.Vector3, THREE.Vector3] {
+  const back = new THREE.Vector3(-Math.sin(seat.yaw), 0, -Math.cos(seat.yaw));
+  const camPos = seat.pos.clone().addScaledVector(back, SEAT_CAM.back).add(new THREE.Vector3(0, SEAT_CAM.height, 0));
+  const look = seat.table.center.clone().addScaledVector(back, SEAT_CAM.lookShift).add(new THREE.Vector3(0, SEAT_CAM.lookY, 0));
+  return [camPos, look];
+}
+export const SEAT_CAM = { back: 0.75, height: 2.35, lookShift: -0.1, lookY: 0.9, fadeNear: 2.2 };
+
 export class Game {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -348,7 +360,10 @@ export class Game {
     if (this.mode === 'explore' && !paused && !this.creator) this.rig.look(look.dx, look.dy, look.zoom);
     const follow = this.player.pos.clone().add(new THREE.Vector3(0, 1.25, 0));
     this.rig.update(dt, follow);
-    if (this.mode === 'explore') this.fader.update(this.camera.position, follow); else this.fader.update(null, follow);
+    if (this.mode === 'explore') this.fader.update(this.camera.position, follow);
+    // masada: yan koltuktakiler kameraya yakın, saydamlaşır (karşıdakiler net kalır)
+    else if (this.mode === 'seated' && this.session && !(this.session instanceof DartSession)) this.fader.update(this.camera.position, follow, SEAT_CAM.fadeNear);
+    else this.fader.update(null, follow);
     this.bubbles.update();
     if (this.voice) {
       const fwd = new THREE.Vector3();
@@ -619,11 +634,7 @@ export class Game {
     this.hud.setPrompt(null);
     this.world.reservedTable = seat.table.id;
     // kamera: oyuncunun arkasından masaya bakış
-    const back = new THREE.Vector3(-Math.sin(seat.yaw), 0, -Math.cos(seat.yaw));
-    // oyuncunun başının üstünden masaya bakış; masa ekranın üst yarısında kalsın (alt yarıda arayüz var)
-    const camPos = seat.pos.clone().addScaledVector(back, 0.15).add(new THREE.Vector3(0, 1.8, 0));
-    const look = seat.table.center.clone().addScaledVector(back, -0.25).add(new THREE.Vector3(0, 0.3, 0));
-    this.rig.setFixed(camPos, look);
+    this.rig.setFixed(...seatCamera(seat));
     this.session = online ? new OnlineSession(this, seat, online) : new TableSession(this, seat);
   }
 
