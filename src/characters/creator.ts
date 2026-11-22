@@ -180,7 +180,9 @@ export function savePlayerSpec(store: SpecStore | null, spec: CharacterSpec) {
 
 export function localSpecStore(): SpecStore | null {
   try {
-    const ls = window.localStorage;
+    // tarayıcıda localStorage; sunucuda (Worker) yok → null
+    const ls = (globalThis as unknown as { localStorage?: { getItem(k: string): string | null; setItem(k: string, v: string): void } }).localStorage;
+    if (!ls) return null;
     return { get: (k) => ls.getItem(k), set: (k, v) => ls.setItem(k, v) };
   } catch { return null; }
 }
