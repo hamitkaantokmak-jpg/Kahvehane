@@ -89,6 +89,20 @@ Herhangi bir masaya otur → **🌐 Arkadaşlarla oyna** → **Oda kur** (ya da 
   Herkes kendi kaos ayarını seçer: **Sakin** olana çay atılamaz, sakin olan da çay atamaz/masa deviremez. Bekleme süreleri var;
   susturulan oyuncunun kaosu ulaşmaz. Serbest yazışma yoktur. Oyun parası çevrimiçi masada kullanılmaz.
 
+### Ortak kahvehane (2. aşama)
+Odadakiler aynı kahvehanede buluşur. Masada **🚶 Kalk, dolaş** ile odadan çıkmadan masadan kalkılır; sağ üstteki salon
+panelinden **Masaya dön**, **Arkadaşa çay**, **Maç gecesi**, **Odadan çık**.
+- Arkadaşlar kahvehanede yürür görünür (konum saniyede birkaç kez paylaşılır); masada olanlar odanın masasında oturur.
+  Herkes odanın kurulduğu masaya (aynı sandalye düzeniyle) oturur.
+- El kol hareketleri (Q menüsü, 1-8) arkadaşlara ulaşır; yakındaki müdavimler de tepki verir.
+- **Salonda çay:** G (önündeki arkadaşa) ya da "Arkadaşa çay". Çaya 20 sn içinde karşılık gelirse **çay kavgası** çıkar;
+  araya çay atan da kavgaya katılır (zincir). Kavga yalnızca görseldir; sonunda Şükrü ayırır. Sakin moddakilere çay atılamaz.
+- **Ortak gerginlik:** masa kaosu, hareketler, çay ve kavga odadaki herkesin ortak çubuğunu doldurur; dolunca herkesin
+  ekranında aynı anda TV'de gol, elektrik kesintisi ya da kedi olayı yaşanır.
+- **Maç gecesi:** herkes TV'de aynı at yarışını izler (aynı tohum, aynı an). Bahis isteğe bağlı ve herkesin kendi oyun içi
+  parasıyla; oyuncular arasında para geçmez.
+- Konum mesajları sunucuda depolamaya yazılmaz (yalnızca iletilir); `src/online/salon.ts` saf kurallar, `OnlineNet.ts` istemci.
+
 **Mimari:** kurallar sunucuda çalışır (istemci yalnızca niyet yollar), herkes yalnızca kendi elini görür.
 - `src/online/protocol.ts` mesajlar · `games.ts` oyun bağdaştırıcıları (doğrulama, bot, gizli bilgisi çıkarılmış görünüm) ·
   `room.ts` saf oda mantığı (zaman ve rastgelelik dışarıdan, JSON durum) · `rotate.ts` "ben = 0" görünümü ·

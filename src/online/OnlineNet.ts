@@ -285,7 +285,7 @@ export class OnlineNet {
     mk('📺 Maç gecesi', () => this.send({ t: 'race' }), 'race');
     mk('✖ Odadan çık', () => { this.close(); this.game.hud.toast('Odadan çıktın.'); }, 'leave');
     c.appendChild(row);
-    c.appendChild(h('div', 'nc-tension', `<span>Ortak gerginlik</span><i style="width:${Math.round(this.tension)}%"></i>`));
+    c.appendChild(h('div', 'nc-hint muted small', 'Üstteki gerginlik çubuğu odadaki herkesle ortak.'));
   }
 
   /** Masaya geri otur (odadaki koltuğuna) */
@@ -363,8 +363,6 @@ export class OnlineNet {
     if (!this.session && this.game.mode === 'explore') {
       if (this.room?.table) this.game.world.reservedTable = this.room.table;
       this.game.hud.setTension(this.tension, levelOf(this.tension));
-      const bar = this.chip?.querySelector('.nc-tension i') as HTMLElement | null;
-      if (bar) bar.style.width = `${Math.round(this.tension)}%`;
     }
   }
 }

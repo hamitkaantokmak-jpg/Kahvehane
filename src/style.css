@@ -610,11 +610,11 @@ table.score tr.win td, table.score tr.me td { background: rgba(47, 143, 78, .15)
 body.online-mode .tension { display: none; }
 
 /* ---------- ortak kahvehane (çevrimiçi salon paneli) ---------- */
-.net-chip { position: absolute; top: 64px; left: 12px; z-index: 12; background: var(--paper); border: 3px solid var(--ink); border-radius: 14px; padding: 6px 8px; box-shadow: 0 4px 0 rgba(0,0,0,.35); max-width: min(360px, 92vw); pointer-events: auto; }
+.net-chip { position: absolute; top: 76px; right: 12px; z-index: 12; background: var(--paper); border: 3px solid var(--ink); border-radius: 14px; padding: 6px 8px; box-shadow: 0 4px 0 rgba(0,0,0,.35); max-width: min(360px, 92vw); pointer-events: auto; }
 .net-chip .nc-title { font-size: 13px; margin-bottom: 4px; }
 .net-chip .nc-row { display: flex; flex-wrap: wrap; gap: 4px; }
 .net-chip .nc-row button { font-size: 12px; padding: 4px 8px; }
 .net-chip .nc-tension { margin-top: 5px; position: relative; height: 14px; border-radius: 7px; background: #e8d9bd; overflow: hidden; border: 2px solid var(--ink); }
 .net-chip .nc-tension span { position: absolute; inset: 0; font-size: 9px; font-weight: 800; text-align: center; line-height: 10px; z-index: 1; }
 .net-chip .nc-tension i { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, #5ad17a, #f2b632, #e0533d); transition: width .4s; }
-@media (max-width: 760px) { .net-chip { top: 54px; left: 8px; padding: 4px 6px; } .net-chip .nc-row button { font-size: 11px; padding: 3px 6px; } }
+@media (max-width: 760px) { .net-chip { top: 100px; right: 8px; left: auto; max-width: 62vw; padding: 4px 6px; } .net-chip .nc-row button { font-size: 11px; padding: 3px 6px; } }
