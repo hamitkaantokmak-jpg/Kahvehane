@@ -47,7 +47,7 @@ export function seatCamera(seat: Seat): [THREE.Vector3, THREE.Vector3] {
   const look = seat.table.center.clone().addScaledVector(back, SEAT_CAM.lookShift).add(new THREE.Vector3(0, SEAT_CAM.lookY, 0));
   return [camPos, look];
 }
-export const SEAT_CAM = { back: 0.75, height: 2.35, lookShift: -0.1, lookY: 0.9 };
+export const SEAT_CAM = { back: 0.75, height: 2.35, lookShift: -0.1, lookY: 0.9, fadeNear: 2.2 };
 
 export class Game {
   readonly renderer: THREE.WebGLRenderer;
@@ -360,7 +360,10 @@ export class Game {
     if (this.mode === 'explore' && !paused && !this.creator) this.rig.look(look.dx, look.dy, look.zoom);
     const follow = this.player.pos.clone().add(new THREE.Vector3(0, 1.25, 0));
     this.rig.update(dt, follow);
-    if (this.mode === 'explore') this.fader.update(this.camera.position, follow); else this.fader.update(null, follow);
+    if (this.mode === 'explore') this.fader.update(this.camera.position, follow);
+    // masada: yan koltuktakiler kameraya yakın, saydamlaşır (karşıdakiler net kalır)
+    else if (this.mode === 'seated' && this.session && !(this.session instanceof DartSession)) this.fader.update(this.camera.position, follow, SEAT_CAM.fadeNear);
+    else this.fader.update(null, follow);
     this.bubbles.update();
     if (this.voice) {
       const fwd = new THREE.Vector3();

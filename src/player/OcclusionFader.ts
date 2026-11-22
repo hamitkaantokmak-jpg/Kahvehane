@@ -20,8 +20,19 @@ export class OcclusionFader {
     return null;
   }
 
-  update(cam: THREE.Vector3 | null, target: THREE.Vector3) {
+  /**
+   * @param near verilirse: kameraya (yatayda) bu mesafeden yakın kökler de saydamlaşır
+   * (masada yan koltuktakilerin kafaları ekranın üstünü kaplamasın diye)
+   */
+  update(cam: THREE.Vector3 | null, target: THREE.Vector3, near = 0) {
     const hitRoots = new Set<THREE.Object3D>();
+    if (cam && near > 0) {
+      for (const r of this.roots) {
+        if (!r.visible) continue;
+        const dx = r.position.x - cam.x, dz = r.position.z - cam.z;
+        if (dx * dx + dz * dz < near * near) hitRoots.add(r);
+      }
+    }
     if (cam) {
       // birkaç ışın: kafa, gövde
       for (const dy of [0.2, -0.45]) {
