@@ -10,6 +10,8 @@ import { applyOutlineVisibility } from '../world/materials';
 import { Character } from '../characters/Character';
 import { loadPlayerSpec, savePlayerSpec, localSpecStore } from '../characters/creator';
 import { CharacterCreator } from '../ui/CharacterCreator';
+import { OnlineSession } from '../online/OnlineSession';
+import { isCode } from '../online/protocol';
 import { NPC_SPECS, PERSONALITIES } from '../npc/roster';
 import { ARCHETYPES } from '../npc/archetypes';
 import { NPC, NpcWorld } from '../npc/NPC';
@@ -64,7 +66,7 @@ export class Game {
   voice!: VoicePlayer;
   private teaseT = 20;
   private raiseT = 90;
-  session: TableSession | DartSession | null = null;
+  session: TableSession | DartSession | OnlineSession | null = null;
   /** Oyun saati (sn) */
   clockTime = 0;
   private clock = new THREE.Clock();
@@ -238,6 +240,7 @@ export class Game {
 
   start() {
     this.renderer.setAnimationLoop(() => this.tick());
+    setTimeout(() => this.offerInvite(), 1200);
   }
 
   // ------------------------------------------------------------ karakter oluşturucu
@@ -600,7 +603,7 @@ export class Game {
   }
 
   // ------------------------------------------------------------ masa oturumu
-  sitDown(seat: Seat) {
+  sitDown(seat: Seat, online?: { create: true } | { code: string }) {
     if (seat.occupant) return;
     const p = this.player;
     p.velocity.set(0, 0, 0);
@@ -620,7 +623,35 @@ export class Game {
     const camPos = seat.pos.clone().addScaledVector(back, 0.15).add(new THREE.Vector3(0, 1.8, 0));
     const look = seat.table.center.clone().addScaledVector(back, -0.25).add(new THREE.Vector3(0, 0.3, 0));
     this.rig.setFixed(camPos, look);
-    this.session = new TableSession(this, seat);
+    this.session = online ? new OnlineSession(this, seat, online) : new TableSession(this, seat);
+  }
+
+  /** Masadaki seçim ekranından çevrimiçi odaya geç (oyuncu oturmaya devam eder) */
+  startOnline(seat: Seat, start: { create: true } | { code: string }) {
+    if (this.session && 'root' in this.session) this.session.root.remove();
+    this.session = new OnlineSession(this, seat, start);
+  }
+
+  /** Davet bağlantısı (?oda=KOD): kart masasında boş bir koltuğa oturup odaya katılmayı teklif et */
+  private offerInvite() {
+    let code: string | null = null;
+    try { code = new URLSearchParams(location.search).get('oda')?.toUpperCase() ?? null; } catch { /* yok */ }
+    if (!code || !isCode(code)) return;
+    const d = document.createElement('div');
+    d.className = 'modal invite-modal';
+    d.innerHTML = `<div class="panel"><h3>🌐 Masaya davet edildin</h3><p>Oda kodu: <b class="room-code">${code}</b></p><p class="muted">Kart masasına oturup arkadaşlarının odasına katılırsın.</p><div class="row-btns"></div></div>`;
+    const row = d.querySelector('.row-btns')!;
+    const no = document.createElement('button'); no.className = 'ghost'; no.textContent = 'Sonra'; no.onclick = () => d.remove();
+    const yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = 'Masaya otur ▶';
+    yes.onclick = () => {
+      d.remove();
+      const t = this.kahve.tables.find((x) => x.kind === 'kart' && x.seats.length === 4) ?? this.kahve.tables.find((x) => x.kind === 'kart')!;
+      const seat = t.seats.find((s) => !s.occupant) ?? t.seats[0];
+      if (seat.occupant) { const n = this.npcs.find((x) => x.c.seat === seat); n?.leaveSeat(); seat.occupant = null; }
+      this.sitDown(seat, { code: code! });
+    };
+    row.append(no, yes);
+    this.overlay.appendChild(d);
   }
 
   startDart() {

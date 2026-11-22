@@ -119,6 +119,25 @@ export class TableSession implements GameHost {
       list.appendChild(card);
     }
     panel.appendChild(list);
+    // çevrimiçi: arkadaşlarla (kart masası)
+    if (this.table.kind === 'kart') {
+      const on = h('div', 'online-entry');
+      on.appendChild(h('div', 'gc-title', '🌐 Arkadaşlarla oyna (çevrimiçi)'));
+      on.appendChild(h('div', 'gc-desc', 'Batak, King ve Pişti. Oda kur, kodu gönder; boş koltuklara müdavimler oturur.'));
+      const row = h('div', 'online-row');
+      row.appendChild(btn('Oda kur', 'primary small', () => this.game.startOnline(this.seat, { create: true })));
+      const code = document.createElement('input');
+      code.maxLength = 4; code.placeholder = 'KOD'; code.className = 'code-input';
+      code.addEventListener('keydown', (e) => e.stopPropagation());
+      code.addEventListener('input', () => { code.value = code.value.toUpperCase().replace(/[^A-Z]/g, ''); });
+      row.appendChild(code);
+      row.appendChild(btn('Koda katıl', 'small', () => {
+        if (code.value.length !== 4) { this.toast('4 harflik oda kodunu yaz.'); return; }
+        this.game.startOnline(this.seat, { code: code.value });
+      }));
+      on.appendChild(row);
+      panel.appendChild(on);
+    }
     // bahis seçimi (oyun içi sanal kahve parası)
     const stakeRow = h('div', 'stake-row');
     stakeRow.appendChild(h('span', '', 'Bahis:'));

@@ -9,9 +9,9 @@ import { TrickUI, TrickSnapshot, suitHtml, SUIT_TR } from './TrickUI';
 
 export class BatakUI extends TrickUI {
   s: B.BatakState;
-  private rng = createRng();
+  protected rng = createRng();
 
-  constructor(host: GameHost, private opts: B.BatakOptions) {
+  constructor(host: GameHost, protected opts: B.BatakOptions) {
     super(host, 'batak');
     this.s = B.newBatak(opts, this.rng);
     this.host.sfx('deal');
@@ -137,12 +137,12 @@ export class BatakUI extends TrickUI {
   }
 
   // ------------------------------------------------------------ insan
-  private doBid(b: number | 'pass') {
+  protected doBid(b: number | 'pass') {
     try { B.bid(this.s, 0, b); this.host.sfx('click'); } catch (e) { this.host.toast((e as Error).message); return; }
     this.after();
   }
 
-  private doTrump(su: Suit) {
+  protected doTrump(su: Suit) {
     try { B.chooseTrump(this.s, 0, su); this.host.sfx('card'); } catch (e) { this.host.toast((e as Error).message); return; }
     this.after();
   }
@@ -153,6 +153,10 @@ export class BatakUI extends TrickUI {
     this.host.sfx('card');
     this.onTrick(r);
   }
+
+  protected newMatchLabel = 'Yeni maç';
+  protected onNextHand() { B.nextHand(this.s, this.rng); this.host.sfx('deal'); this.render(); this.pump(); }
+  protected onNewMatch() { this.s = B.newBatak(this.opts, this.rng); this.host.sfx('deal'); this.render(); this.pump(); }
 
   protected handOver() { return this.s.phase === 'handOver' || this.s.phase === 'matchOver'; }
 
@@ -175,10 +179,10 @@ export class BatakUI extends TrickUI {
       <p class="muted">El ${s.handNo}/${this.opts.hands}. Koz: ${SUIT_TR[s.trump!]}.${this.opts.partners ? ' Eşli: ortakların elleri birlikte sayılır.' : ''}${this.opts.zeroPenalty ? ' El almayan cezalı: hiç el alamayan ihale kadar kaybeder.' : ''}</p>
       ${over ? `<h3>${mine ? '🏆 Maçı KAZANDIN!' : `🏆 Maçı ${winners.map((w) => names[w]).join(' & ')} kazandı`}</h3>` : ''}</div>`;
     const row = h('div', 'row-btns');
-    if (!over) row.appendChild(btn('Sonraki el ▶', 'primary', () => { m.remove(); B.nextHand(s, this.rng); this.host.sfx('deal'); this.render(); this.pump(); }));
+    if (!over) row.appendChild(btn('Sonraki el ▶', 'primary', () => { m.remove(); this.onNextHand(); }));
     else {
       this.host.matchFinished(mine);
-      row.appendChild(btn('Yeni maç', 'primary', () => { m.remove(); this.s = B.newBatak(this.opts, this.rng); this.host.sfx('deal'); this.render(); this.pump(); }));
+      row.appendChild(btn(this.newMatchLabel, 'primary', () => { m.remove(); this.onNewMatch(); }));
     }
     row.appendChild(btn('Masadan kalk', 'ghost', () => this.host.exit()));
     m.querySelector('.panel')!.appendChild(row);

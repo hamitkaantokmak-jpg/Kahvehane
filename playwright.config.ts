@@ -12,10 +12,20 @@ export default defineConfig({
     viewport: { width: 1280, height: 720 },
     launchOptions: { args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] },
   },
-  webServer: {
-    command: 'npx vite --port 5174 --strictPort',
-    url: 'http://localhost:5174',
-    reuseExistingServer: true,
-    timeout: 60_000,
-  },
+  webServer: [
+    {
+      command: 'npx vite --port 5174 --strictPort',
+      url: 'http://localhost:5174',
+      reuseExistingServer: true,
+      timeout: 60_000,
+    },
+    {
+      // çevrimiçi testler için yerel oda sunucusu (Cloudflare Worker, yerel çalışma zamanı)
+      command: 'npx wrangler dev --config server/wrangler.toml --port 8788 --local',
+      url: 'http://localhost:8788/health',
+      reuseExistingServer: true,
+      timeout: 120_000,
+      env: { WRANGLER_SEND_METRICS: 'false' },
+    },
+  ],
 });

@@ -75,6 +75,25 @@ Klasik Okey ve 101, yukarıdan bakılan yeşil çuha bir masada oynanır (`src/u
 - Dar ekranda yan ve karşı kenarlardaki perler küçük çizilir; o kenara dokununca büyük görünüm açılır.
   Yatay telefonda ıstaka solda, durum ve düğmeler sağda durur.
 
+## Çevrimiçi: arkadaşlarla masa (1. aşama)
+Kart masasına otur → **🌐 Arkadaşlarla oyna** → **Oda kur** (ya da 4 harflik kodla **Koda katıl**). Lobide oda kodu ve
+**davet bağlantısı** (`…/Kahvehane/?oda=KOD`) paylaşılır; bağlantıyı açan arkadaş masaya oturup odaya katılır.
+- Oyunlar: **İhaleli Batak, King, Pişti (2 ve 4 kişi)**. Oda sahibi oyunu, seçenekleri ve müdavim seviyesini seçip başlatır.
+- En çok 4 kişi; boş koltuklara müdavimler (bot) oturur. Arkadaşların, karakter oluşturucudaki karakterleriyle masada oturur.
+- Bağlantısı kopanın ya da 60 sn oynamayanın yerine müdavim oynar; geri dönen (aynı tarayıcı sekmesi) koltuğuna döner.
+- **Kaos (yalnızca görsel):** 💬 hazır sözlerle laf atma, 🙋 itiraz, 👊 masaya vurma, 💦 çay atma, 🌪️ masayı devirme (maçta bir kez).
+  Herkes kendi kaos ayarını seçer: **Sakin** olana çay atılamaz, sakin olan da çay atamaz/masa deviremez. Bekleme süreleri var;
+  susturulan oyuncunun kaosu ulaşmaz. Serbest yazışma yoktur. Oyun parası çevrimiçi masada kullanılmaz.
+
+**Mimari:** kurallar sunucuda çalışır (istemci yalnızca niyet yollar), herkes yalnızca kendi elini görür.
+- `src/online/protocol.ts` mesajlar · `games.ts` oyun bağdaştırıcıları (doğrulama, bot, gizli bilgisi çıkarılmış görünüm) ·
+  `room.ts` saf oda mantığı (zaman ve rastgelelik dışarıdan, JSON durum) · `rotate.ts` "ben = 0" görünümü ·
+  `OnlineClient.ts` yeniden bağlanan WebSocket · `OnlineSession.ts` lobi + masa + kaos · `OnlineUIs.ts` çevrimiçi oyun arayüzleri.
+- `server/`: Cloudflare Worker + Durable Object (her oda ayrı nesne; uyuyup uyansa da durum korunur; yalnızca sitenin ve yerel
+  adreslerin bağlanmasına izin verir). Yayın: `cd server && npx wrangler deploy` (Cloudflare API anahtarı gerekir).
+- Yerel geliştirme: `npx wrangler dev --config server/wrangler.toml --port 8788` ve oyunu `?server=http://localhost:8788` ile aç.
+- Testler: `tests/onlineRoom.test.ts`, `tests/onlineRotate.test.ts`, `tests/e2e/online.spec.ts` (iki tarayıcı, yerel sunucu).
+
 ## Karakter oluşturucu
 **C** tuşu ya da ☰ menü → **Karakterini düzenle**. Kamera karakterine döner; her değişiklik modeli canlı olarak yeniden kurar.
 - **Yüz:** ten rengi, kafa şekli ve büyüklüğü, burun şekli ve büyüklüğü, kaş, gözlük
