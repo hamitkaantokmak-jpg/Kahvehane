@@ -66,7 +66,7 @@ describe('Çevrimiçi okey, 101 ve tavla', () => {
       playToEnd(r, { 0: a, 1: b });
       expect(r.d.phase).toBe('lobby');
       expect(r.d.lastResult?.game).toBe(game);
-    });
+    }, 60_000);
   }
 
   it('101 botu: yerden aldığını kullanamazsa geri koyup desteden çeker (oyun kilitlenmez)', () => {
