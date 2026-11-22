@@ -9,6 +9,7 @@
 import { sanitizeName, sanitizeSpec } from '../characters/creator';
 import type { CharacterSpec } from '../characters/CharacterSpec';
 import { ONLINE_ENGINES } from './games';
+import { YANCI, YANCI_GAMES, botCatchAt, peekTargetOf, revealedCount, shuffledIds } from './yanci';
 import { Presence, SALON_EMOTES, SALON_TIMING, SalonState, addTension, cleanPresence, newSalon, onSalonTea, requestRace, tensionNow } from './salon';
 import {
   ChaosKind, ChaosPref, ClientMsg, DEFAULT_OPTIONS, GAMES_OF_KIND, GameAction, GameEvent, OnlineGameId, OnlineOptions, PROTOCOL_VERSION,
@@ -55,6 +56,13 @@ export interface PlayerRec {
   posAt?: number;
   emoteAt?: number;
   salonTeaAt?: number;
+  /** yancı modu: yancısı olduğu koltuk */
+  yanci?: number | null;
+  peek?: { since: number; order: number[]; catchAt: number | null; cued: boolean; sent: number } | null;
+  peekEnd?: number;
+  /** yakalandığı el (o el bir daha bakamaz) */
+  peekBanHand?: number;
+  missCdUntil?: number;
 }
 
 export interface Out { to: string; msg: ServerMsg }
@@ -135,9 +143,11 @@ export class Room {
       p.spec = { ...sanitizeSpec(m.spec), name: p.name };
       if (PREFS.includes(m.chaos)) p.chaos = m.chaos;
     } else {
-      if (this.humans.length >= this.capacity) return { player: null, out: [] };
+      // okey masasında koltuklar doluysa yancı olmak için koltuksuz katılınır (en çok koltuk sayısı kadar)
+      const watchOk = this.kind === 'okey' && this.d.players.length < this.capacity * 2;
+      if (this.humans.length >= this.capacity && !watchOk) return { player: null, out: [] };
       const seat = this.freeSeatFor();
-      if (seat === null) return { player: null, out: [] };
+      if (seat === null && !watchOk) return { player: null, out: [] };
       const id = `p${++this.d.idCounter}`;
       const token = Math.floor(this.rng() * 2 ** 32).toString(36) + Math.floor(this.rng() * 2 ** 32).toString(36) + this.d.idCounter.toString(36);
       const name = sanitizeName(m.name);
@@ -150,7 +160,7 @@ export class Room {
     if (!this.d.host || !this.player(this.d.host)?.connected) this.d.host = p.id;
     const out: Out[] = [{ to: p.id, msg: { t: 'welcome', you: p.id, token: p.token, seat: p.seat, room: this.view() } }];
     out.push(...this.roomToAll(p.id));
-    if (this.d.phase === 'playing') out.push(...this.stateTo([p]));
+    if (this.d.phase === 'playing') out.push(...this.stateTo([p]), ...this.yanciStateTo([p]));
     // ortak kahvehane: diğerlerinin konumu, gerginlik, yaklaşan maç gecesi
     for (const o of this.d.players) if (o !== p && o.connected && o.pos) out.push({ to: p.id, msg: { t: 'pos', p: o.id, ...o.pos } });
     out.push({ to: p.id, msg: { t: 'tension', v: Math.round(tensionNow(this.salon, now)) } });
@@ -170,13 +180,14 @@ export class Room {
     const p = this.player(id);
     if (!p) return [];
     p.connected = false;
+    const pre = p.peek ? this.endPeek(p, now) : [];
     p.lastSeen = now;
     if (this.d.phase === 'lobby') {
       // lobide kopan koltuğunu bırakır
       this.d.players = this.d.players.filter((x) => x !== p);
     }
     if (this.d.host === id) this.d.host = this.d.players.find((x) => x.connected)?.id ?? null;
-    return this.roomToAll(null);
+    return [...pre, ...this.roomToAll(null)];
   }
 
   // ------------------------------------------------------------------ mesajlar
@@ -200,6 +211,10 @@ export class Room {
         case 'emote': return this.onEmote(p, m.id, now);
         case 'salonTea': return this.onSalonTea(p, m.target, now);
         case 'race': return this.onRace(p, now);
+        case 'yanci': return this.onYanci(p, m.seat, now);
+        case 'peek': return this.onPeek(p, !!m.on, now);
+        case 'catch': return this.onCatch(p, now);
+        case 'point': return this.onPoint(p, m.id);
         case 'pref': if (PREFS.includes(m.chaos)) p.chaos = m.chaos; return this.roomToAll(null);
         case 'mute': {
           if (typeof m.player !== 'string') return [];
@@ -219,6 +234,7 @@ export class Room {
     if (!Number.isInteger(seat) || seat < 0 || seat >= this.capacity) return [this.err(p.id, 'Geçersiz koltuk.')];
     if (this.bySeat(seat)) return [this.err(p.id, 'Bu koltuk dolu.')];
     p.seat = seat;
+    p.yanci = null;
     return this.roomToAll(null);
   }
 
@@ -262,7 +278,7 @@ export class Room {
     this.d.nextActAt = now + TIMING.botDelay;
     this.d.turnSince = now;
     for (const h of this.d.players) h.flipUsed = false;
-    return [...this.roomToAll(null), ...this.stateTo(this.humans)];
+    return [...this.roomToAll(null), ...this.stateToAll()];
   }
 
   private onAct(p: PlayerRec, a: GameAction, now: number): Out[] {
@@ -281,7 +297,7 @@ export class Room {
     this.d.turnSince = now;
     this.d.nextActAt = now + (ev.trickDone ? TIMING.afterTrick + TIMING.botDelay : TIMING.botDelay);
     this.d.pauseUntil = ev.trickDone ? now + TIMING.afterTrick : 0;
-    const out = this.stateTo(this.humans);
+    const out = this.stateToAll();
     if (this.engine.handOver(this.d.state)) {
       this.d.handOverAt = now;
       this.d.nextVotes = [];
@@ -298,6 +314,8 @@ export class Room {
   }
 
   private startNextHand(now: number): Out[] {
+    const pre: Out[] = [];
+    for (const y of this.d.players) if (y.peek) pre.push(...this.endPeek(y, now));
     this.engine.nextHand(this.d.state, this.rng);
     this.d.handOverAt = null;
     this.d.nextVotes = [];
@@ -305,10 +323,11 @@ export class Room {
     this.d.lastEvent = null;
     this.d.nextActAt = now + TIMING.botDelay;
     this.d.turnSince = now;
-    return this.stateTo(this.humans);
+    return [...pre, ...this.stateToAll()];
   }
 
   private finishMatch(): Out[] {
+    for (const y of this.d.players) if (y.peek) { y.peek = null; y.peekEnd = 0; }
     const r = this.engine.result(this.d.state);
     this.d.lastResult = { game: this.d.game, winners: r.winners, totals: r.totals, names: [...Array(this.seatCount).keys()].map((s) => this.seatName(s)) };
     this.d.phase = 'lobby';
@@ -400,6 +419,11 @@ export class Room {
   /** Sırası gelen bot (ya da kopmuş/oynamayan insan yerine bot) oynar; el sonu beklemesi dolarsa yeni el başlar */
   tick(now: number): Out[] {
     if (this.d.phase !== 'playing') return [];
+    const peeks = this.peekTick(now);
+    return peeks.length ? [...peeks, ...this.gameTick(now)] : this.gameTick(now);
+  }
+
+  private gameTick(now: number): Out[] {
     if (this.d.handOverAt !== null) return now - this.d.handOverAt >= TIMING.handOverWait ? this.startNextHand(now) : [];
     const seat = this.engine.actor(this.d.state);
     if (seat === null || now < this.d.nextActAt) return [];
@@ -423,6 +447,20 @@ export class Room {
   /** Bir sonraki tick ne zaman gerekli (ms, mutlak); gerekmiyorsa null */
   nextWake(now: number): number | null {
     if (this.d.phase !== 'playing') return null;
+    const g = this.gameWake(now);
+    let w = g;
+    for (const y of this.d.players) {
+      const pk = y.peek;
+      if (!pk) continue;
+      const cands = [pk.since + YANCI.maxPeek, pk.since + pk.sent * YANCI.revealEvery];
+      if (pk.catchAt !== null) cands.push(pk.catchAt);
+      if (!pk.cued) cands.push(pk.since + YANCI.cueAfter);
+      for (const c of cands) w = w === null ? Math.max(now, c) : Math.min(w, Math.max(now, c));
+    }
+    return w;
+  }
+
+  private gameWake(now: number): number | null {
     if (this.d.handOverAt !== null) return this.d.handOverAt + TIMING.handOverWait;
     const seat = this.engine.actor(this.d.state);
     if (seat === null) return null;
@@ -430,6 +468,118 @@ export class Room {
     if (!h) return Math.max(now, this.d.nextActAt);
     if (!h.connected) return Math.max(now, this.d.nextActAt, h.lastSeen + TIMING.disconnectGrace);
     return Math.max(now, this.d.nextActAt, this.d.turnSince + TIMING.idleTakeover);
+  }
+
+  // ------------------------------------------------------------------ yancı modu (okey masası)
+  private get yanciOk() { return this.kind === 'okey' && (YANCI_GAMES as readonly string[]).includes(this.d.game); }
+  private yancisOf(seat: number) { return this.d.players.find((x) => x.yanci === seat) ?? null; }
+  private handNo(): number { return (this.d.state as { handNo?: number } | null)?.handNo ?? 0; }
+  private handOfSeat(seat: number): { id: number }[] { return ((this.d.state as { hands?: { id: number }[][] } | null)?.hands?.[seat]) ?? []; }
+
+  private onYanci(p: PlayerRec, seat: number | null, now: number): Out[] {
+    if (this.kind !== 'okey') return [this.err(p.id, 'Yancılık yalnızca okey masasında.')];
+    if (seat === null) {
+      const pre = p.peek ? this.endPeek(p, now) : [];
+      p.yanci = null;
+      return [...pre, ...this.roomToAll(null)];
+    }
+    if (!Number.isInteger(seat) || seat < 0 || seat >= this.capacity) return [this.err(p.id, 'Geçersiz koltuk.')];
+    if (p.seat === seat) return [this.err(p.id, 'Kendi kendine yancı olamazsın.')];
+    const cur = this.yancisOf(seat);
+    if (cur && cur !== p) return [this.err(p.id, 'Bu oyuncunun zaten bir yancısı var.')];
+    if (p.seat !== null) {
+      if (this.d.phase !== 'lobby') return [this.err(p.id, 'Oyun sürerken koltuğunu bırakamazsın.')];
+      p.seat = null;
+    }
+    if (p.peek) this.endPeek(p, now);
+    p.yanci = seat;
+    const out = this.roomToAll(null);
+    if (this.d.phase === 'playing') out.push(...this.yanciStateTo([p]));
+    return out;
+  }
+
+  private onPeek(p: PlayerRec, on: boolean, now: number): Out[] {
+    if (!on) return p.peek ? this.endPeek(p, now) : [];
+    if (p.yanci === null || p.yanci === undefined) return [this.err(p.id, 'Önce birinin yancısı ol.')];
+    if (this.d.phase !== 'playing' || !this.yanciOk || this.d.handOverAt !== null) return [this.err(p.id, 'Şu an bakılacak el yok.')];
+    if (p.peek) return [];
+    if (p.peekBanHand === this.handNo()) return [this.err(p.id, 'Bu el yakalandın, bir daha bakamazsın! 😅')];
+    if (now - (p.peekEnd ?? -1e9) < YANCI.peekGap) return [this.err(p.id, 'Biraz bekle, göze batma.')];
+    const target = peekTargetOf(p.yanci, this.seatCount);
+    const bot = !this.bySeat(target);
+    p.peek = { since: now, order: shuffledIds(this.handOfSeat(target).map((t) => t.id), this.rng), catchAt: bot ? botCatchAt(now, this.rng, this.d.options.difficulty) : null, cued: false, sent: 0 };
+    return [...this.toAll({ t: 'lean', p: p.id, on: true }), ...this.peekView(p, now)];
+  }
+
+  /** Yancıya şimdiye kadar gördüğü taşlar */
+  private peekView(p: PlayerRec, now: number): Out[] {
+    const pk = p.peek!;
+    const target = peekTargetOf(p.yanci!, this.seatCount);
+    const hand = this.handOfSeat(target);
+    const n = revealedCount(pk.since, now, pk.order.length);
+    pk.sent = n;
+    const seen = new Set(pk.order.slice(0, n));
+    return [{ to: p.id, msg: { t: 'peekView', seat: target, tiles: hand.filter((t) => seen.has(t.id)), total: hand.length } }];
+  }
+
+  private endPeek(p: PlayerRec, now: number): Out[] {
+    if (!p.peek) return [];
+    const target = p.yanci !== null && p.yanci !== undefined ? this.bySeat(peekTargetOf(p.yanci, this.seatCount)) : null;
+    const cued = p.peek.cued;
+    p.peek = null;
+    p.peekEnd = now;
+    const out = this.toAll({ t: 'lean', p: p.id, on: false });
+    if (target && cued) out.push({ to: target.id, msg: { t: 'peekCue', on: false } });
+    return out;
+  }
+
+  /** Yancı yakalandı: tokat, o el bir daha bakamaz */
+  private caught(y: PlayerRec, by: number, now: number): Out[] {
+    const out = this.endPeek(y, now);
+    y.peekBanHand = this.handNo();
+    out.push(...this.toAll({ t: 'slap', by, yanci: y.id, ok: true }), ...this.tension('slam', now));
+    return out;
+  }
+
+  private onCatch(p: PlayerRec, now: number): Out[] {
+    if (p.seat === null || this.d.phase !== 'playing') return [];
+    const y = this.d.players.find((x) => x.yanci !== null && x.yanci !== undefined && peekTargetOf(x.yanci, this.seatCount) === p.seat);
+    if (!y) return [this.err(p.id, 'Yanında bakan yancı yok.')];
+    if (now < (p.missCdUntil ?? 0)) return [this.err(p.id, 'Az önce boşa tokat attın, biraz sakin!')];
+    if (y.peek || now - (y.peekEnd ?? -1e9) <= YANCI.grace) return this.caught(y, p.seat, now);
+    p.missCdUntil = now + YANCI.missCooldown;
+    return this.toAll({ t: 'slap', by: p.seat, yanci: y.id, ok: false });
+  }
+
+  private onPoint(p: PlayerRec, id: number): Out[] {
+    if (p.yanci === null || p.yanci === undefined || !Number.isInteger(id)) return [];
+    const owner = this.bySeat(p.yanci);
+    return owner?.connected ? [{ to: owner.id, msg: { t: 'point', id, from: p.id } }] : [];
+  }
+
+  /** Bakışlar: taşlar yavaş yavaş görünür, süre dolar, müdavim fark eder, bakılan insana "👀" */
+  private peekTick(now: number): Out[] {
+    const out: Out[] = [];
+    for (const y of this.d.players) {
+      const pk = y.peek;
+      if (!pk || y.yanci === null || y.yanci === undefined) continue;
+      const target = peekTargetOf(y.yanci, this.seatCount);
+      if (pk.catchAt !== null && now >= pk.catchAt) { out.push(...this.caught(y, target, now)); continue; }
+      if (now >= pk.since + YANCI.maxPeek) { out.push(...this.endPeek(y, now)); continue; }
+      const t = this.bySeat(target);
+      if (!pk.cued && now >= pk.since + YANCI.cueAfter) { pk.cued = true; if (t?.connected) out.push({ to: t.id, msg: { t: 'peekCue', on: true } }); }
+      if (revealedCount(pk.since, now, pk.order.length) > pk.sent) out.push(...this.peekView(y, now));
+    }
+    return out;
+  }
+
+  /** Yancılara sahiplerinin görünümü */
+  private yanciStateTo(ps: PlayerRec[]): Out[] {
+    if (this.d.state === null || !this.yanciOk) return [];
+    return ps.filter((p) => p.connected && p.seat === null && p.yanci !== null && p.yanci !== undefined && p.yanci < this.seatCount).map((p) => ({
+      to: p.id,
+      msg: { t: 'state', seq: this.d.seq, game: this.d.game, seat: p.yanci!, view: this.engine.view(this.d.state, p.yanci!), event: this.d.lastEvent, yanci: true },
+    }));
   }
 
   // ------------------------------------------------------------------ görünümler
@@ -443,6 +593,7 @@ export class Room {
         const p = this.bySeat(s);
         return p ? { occ: 'human', name: p.name, player: p.id, spec: p.spec, connected: p.connected, chaos: p.chaos, ...(p.pos?.roam ? { roam: true } : {}) } : { occ: 'bot', name: BOT_SEATS[s].name };
       }),
+      watchers: this.d.players.filter((p) => p.seat === null).map((p) => ({ player: p.id, name: p.name, spec: p.spec, connected: p.connected, yanci: p.yanci ?? null, ...(p.pos?.roam ? { roam: true } : {}) })),
     };
   }
 
@@ -453,6 +604,15 @@ export class Room {
 
   private stateTo(ps: PlayerRec[]): Out[] {
     if (this.d.state === null) return [];
+    return this.stateToSeated(ps);
+  }
+
+  /** Herkese (oyunculara ve sahiplerinin gözünden yancılara) güncel durum */
+  private stateToAll(): Out[] {
+    return [...this.stateToSeated(this.humans), ...this.yanciStateTo(this.d.players)];
+  }
+
+  private stateToSeated(ps: PlayerRec[]): Out[] {
     return ps.filter((p) => p.connected && p.seat !== null).map((p) => ({
       to: p.id,
       msg: { t: 'state', seq: this.d.seq, game: this.d.game, seat: p.seat!, view: this.engine.view(this.d.state, p.seat!), event: this.d.lastEvent },

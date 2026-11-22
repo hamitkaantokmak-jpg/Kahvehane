@@ -90,7 +90,12 @@ export type ClientMsg =
   | { t: 'pos'; x: number; z: number; yaw: number; m: boolean; roam: boolean }
   | { t: 'emote'; id: SalonEmote }
   | { t: 'salonTea'; target: string }
-  | { t: 'race' };
+  | { t: 'race' }
+  // yancı modu (okey masası)
+  | { t: 'yanci'; seat: number | null }
+  | { t: 'peek'; on: boolean }
+  | { t: 'catch' }
+  | { t: 'point'; id: number };
 
 export interface SeatView {
   occ: 'human' | 'bot' | 'empty';
@@ -100,6 +105,17 @@ export interface SeatView {
   connected?: boolean;
   chaos?: ChaosPref;
   /** masadan kalkmış, salonda dolaşıyor */
+  roam?: boolean;
+}
+
+/** Koltuksuz oyuncu: izleyici ya da bir koltuğun yancısı */
+export interface WatcherView {
+  player: string;
+  name: string;
+  spec: CharacterSpec;
+  connected: boolean;
+  /** yancısı olduğu koltuk */
+  yanci: number | null;
   roam?: boolean;
 }
 
@@ -113,6 +129,8 @@ export interface RoomView {
   game: OnlineGameId;
   options: OnlineOptions;
   seats: SeatView[];
+  /** koltuksuz oyuncular (yancılar) — eski sunucularda yok */
+  watchers?: WatcherView[];
   /** son maçın sonucu (lobide gösterilir) */
   lastResult: { game: OnlineGameId; winners: number[]; names: string[]; totals: number[] } | null;
 }
@@ -120,7 +138,7 @@ export interface RoomView {
 export type ServerMsg =
   | { t: 'welcome'; you: string; token: string; seat: number | null; room: RoomView }
   | { t: 'room'; room: RoomView; seat: number | null }
-  | { t: 'state'; seq: number; game: OnlineGameId; seat: number; view: unknown; event: GameEvent | null }
+  | { t: 'state'; seq: number; game: OnlineGameId; seat: number; view: unknown; event: GameEvent | null; yanci?: boolean }
   | { t: 'chaos'; from: number; kind: ChaosKind; target?: number; phrase?: number }
   | { t: 'error'; msg: string }
   | { t: 'pong' }
@@ -130,7 +148,17 @@ export type ServerMsg =
   | { t: 'brawl'; ids: string[]; ms: number }
   | { t: 'tension'; v: number }
   | { t: 'event'; id: SharedEvent }
-  | { t: 'race'; seed: number; in: number };
+  | { t: 'race'; seed: number; in: number }
+  /** yancı gizlice bakıyor (herkes karakterin eğildiğini görür) */
+  | { t: 'lean'; p: string; on: boolean }
+  /** yalnızca yancıya: bakılan oyuncunun şimdiye kadar görünen taşları */
+  | { t: 'peekView'; seat: number; tiles: unknown[]; total: number }
+  /** yalnızca bakılan oyuncuya: biri eline bakıyor olabilir */
+  | { t: 'peekCue'; on: boolean }
+  /** tokat: ok=yakalandı, değilse boşa */
+  | { t: 'slap'; by: number; yanci: string; ok: boolean }
+  /** yalnızca sahibine: yancının işaret ettiği taş */
+  | { t: 'point'; id: number; from: string };
 
 /** Son hamlenin özeti (istemci animasyon/tepki için) */
 export interface GameEvent {
