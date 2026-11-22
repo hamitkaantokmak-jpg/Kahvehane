@@ -20,6 +20,9 @@ import { seatCamera } from '../core/Game';
 import { ChaosKind, ChaosPref, GAMES_OF_KIND, GameAction, OnlineGameId, RoomKind, RoomView, SEATS_OF, ServerMsg, TAUNTS } from './protocol';
 import { BOT_SEATS } from './room';
 import { actionToAbs, rotateEvent, rotateView, toAbs, toRel } from './rotate';
+import { peekTargetOf } from './yanci';
+import { tileEl } from '../ui/games/TileView';
+import type { Tile, OkeyCtx } from '../games/common/tiles';
 import { NetUI, OnlineBatakUI, OnlineKingUI, OnlineOkey101UI, OnlineOkeyUI, OnlinePistiUI, OnlineTavlaUI } from './OnlineUIs';
 
 const PREF_TR: Record<ChaosPref, string> = { calm: 'Sakin', normal: 'Normal', chaos: 'Tam kaos' };
@@ -34,6 +37,17 @@ export class OnlineSession implements GameHost {
   room: RoomView | null = null;
   /** benim mutlak koltuğum */
   mySeat: number | null = null;
+  /** yancısı olduğum koltuk (koltuksuzsam) */
+  yanciOf: number | null = null;
+  /** görünümün kimin gözünden olduğu: kendi koltuğum ya da yancısı olduğum koltuk */
+  get viewSeat(): number | null { return this.mySeat ?? this.yanciOf; }
+  private yanciBar: HTMLDivElement | null = null;
+  private peekPanel: HTMLDivElement | null = null;
+  private badges: HTMLDivElement | null = null;
+  private peekCueOn = false;
+  /** son hata ve tokatlar (ekranda kısa kalır; testler ve kayıt için) */
+  lastError = '';
+  readonly slaps: { by: number; yanci: string; ok: boolean }[] = [];
   ui: (NetUI & { el: HTMLElement }) | null = null;
   uiGame: OnlineGameId | null = null;
   names: string[] = [];
@@ -147,18 +161,27 @@ export class OnlineSession implements GameHost {
       case 'room': this.mySeat = m.seat; this.setRoom(m.room); break;
       case 'state': this.onState(m); break;
       case 'chaos': this.onChaos(m); break;
-      case 'error': this.toast(m.msg); break;
+      case 'error': this.lastError = m.msg; this.toast(m.msg); break;
+      case 'peekView': this.onPeekView(m); break;
+      case 'peekCue': this.peekCueOn = m.on; this.renderBadges(); if (m.on) sfx.play('pop'); break;
+      case 'slap': this.onSlap(m); break;
+      case 'point': this.onPoint(m); break;
     }
   }
 
   private setRoom(r: RoomView) {
     this.room = r;
+    const wasYanci = this.yanciOf;
+    this.yanciOf = this.mySeat === null ? r.watchers?.find((w) => w.player === this.net?.you)?.yanci ?? null : null;
+    // yancılık bitti/değişti: oyun ekranı yeniden kurulur
+    if (this.ui && wasYanci !== this.yanciOf) this.backToLobby();
     this.syncSeats();
+    this.renderBadges();
     if (!this.ui) this.renderLobby();
   }
 
   private onState(m: Extract<ServerMsg, { t: 'state' }>) {
-    this.mySeat = m.seat;
+    if (m.yanci) { this.mySeat = null; this.yanciOf = m.seat; } else { this.mySeat = m.seat; this.yanciOf = null; }
     const n = SEATS_OF[m.game];
     if (!this.ui || this.uiGame !== m.game) this.startUI(m.game);
     const view = rotateView(m.game, m.view, m.seat);
@@ -176,7 +199,8 @@ export class OnlineSession implements GameHost {
     this.table.props.visible = false;
     this.table3d.clear();
     this.game.player.model.root.visible = false;
-    const net = { act: (a: GameAction) => this.client?.send({ t: 'act', a: actionToAbs(g, a, this.mySeat ?? 0) }), next: () => this.client?.send({ t: 'next' }), toLobby: () => this.backToLobby() };
+    const yanci = this.yanciOf !== null;
+    const net = { act: (a: GameAction) => (yanci ? this.toast('Yancısın: oynayamazsın, ama taşa dokunarak sahibine işaret edebilirsin.') : this.client?.send({ t: 'act', a: actionToAbs(g, a, this.viewSeat ?? 0) })), next: () => this.client?.send({ t: 'next' }), toLobby: () => this.backToLobby() };
     if (g === 'batak') this.ui = new OnlineBatakUI(this, { partners: !!o?.batakPartners, hands: o?.batakHands ?? 5, zeroPenalty: !!o?.batakZeroPenalty }, net);
     else if (g === 'king') this.ui = new OnlineKingUI(this, { short: !!o?.kingShort }, net);
     else if (g === 'okey') this.ui = new OnlineOkeyUI(this, net);
@@ -184,7 +208,8 @@ export class OnlineSession implements GameHost {
     else if (g === 'tavla') this.ui = new OnlineTavlaUI(this, { target: o?.tavlaTarget ?? 5, katmerliMars: o?.tavlaKatmerli ?? true }, net);
     else this.ui = new OnlinePistiUI(this, { players: g === 'pisti2' ? 2 : 4, target: o?.pistiTarget ?? 101 }, net);
     this.root.insertBefore(this.ui.el, this.status);
-    this.addChaosBar();
+    if (yanci) this.addYanciBar(); else this.addChaosBar();
+    this.renderBadges();
   }
 
   private backToLobby() {
@@ -193,6 +218,10 @@ export class OnlineSession implements GameHost {
     this.uiGame = null;
     this.chaosBar?.remove();
     this.chaosBar = null;
+    this.yanciBar?.remove();
+    this.yanciBar = null;
+    this.peekPanel?.remove();
+    this.peekPanel = null;
     this.table3d.clear();
     this.table.props.visible = true;
     this.root.insertBefore(this.panel, this.status);
@@ -230,9 +259,25 @@ export class OnlineSession implements GameHost {
       const tag = s.occ === 'bot' ? '🤖 müdavim' : s.player === r.host ? '👑 oda sahibi' : '🙂 oyuncu';
       d.innerHTML = `<div class="nm">${s.name}${i === this.mySeat ? ' (sen)' : ''}</div><div class="meta">${tag}${s.chaos ? ` · ${PREF_TR[s.chaos]}` : ''}${s.occ === 'human' && !s.connected ? ' · bağlantı yok' : ''}</div>`;
       if (r.phase === 'lobby' && s.occ === 'bot') d.appendChild(btn('Buraya geç', 'small', () => this.client?.send({ t: 'seat', seat: i })));
+      // yancı modu (okey masası): her koltuğa bir yancı
+      if (r.kind === 'okey') {
+        const y = r.watchers?.find((w) => w.yanci === i);
+        if (y) d.appendChild(h('div', 'meta yanci-of', `🧍 ${y.player === this.net?.you ? 'Sen' : y.name} yancı`));
+        else if (i !== this.mySeat && (r.phase === 'lobby' || this.mySeat === null)) {
+          const b = btn('🧍 Yancı ol', 'small', () => this.client?.send({ t: 'yanci', seat: i }));
+          b.dataset.yanci = String(i);
+          d.appendChild(b);
+        }
+      }
       seats.appendChild(d);
     });
     p.appendChild(seats);
+    if (r.kind === 'okey') {
+      const idle = (r.watchers ?? []).filter((w) => w.yanci === null);
+      if (idle.length) p.appendChild(h('p', 'muted small', `Ayakta bekleyen: ${idle.map((w) => (w.player === this.net?.you ? 'sen' : w.name)).join(', ')} — bir koltuğa "Yancı ol".`));
+      p.appendChild(h('p', 'muted small', 'Yancı, sahibinin ıstakasını görür ve ona taş işaret eder; sağdakinin eline gizlice bakabilir ama yakalanırsa tokadı yer!'));
+      if (this.yanciOf !== null) p.appendChild(btn('Yancılığı bırak', 'small ghost', () => this.client?.send({ t: 'yanci', seat: null })));
+    }
     if (r.game === 'batak' && r.options.batakPartners) p.appendChild(h('p', 'muted small', 'Eşli batak: karşılıklı koltuklar ortaktır (1-3, 2-4).'));
     // oyun seçimi
     const gameRow = h('div', 'online-games');
@@ -291,16 +336,20 @@ export class OnlineSession implements GameHost {
   private tableSeat(abs: number, n: number): Seat {
     const ph = this.net?.physSeat(abs, n);
     if (ph) return ph;
-    const rel = toRel(abs, this.mySeat ?? 0, n);
+    const rel = toRel(abs, this.viewSeat ?? 0, n);
     const off = n === 2 && this.table.seats.length === 4 ? rel * 2 : rel;
     return this.table.seats[(this.seat.index + off) % this.table.seats.length];
   }
 
   /** Oyuncu odadaki koltuk numarasına karşılık gelen sandalyede otursun (herkes aynı yerleşimi görür) */
   private ensureMySeat(n: number) {
-    if (this.mySeat === null || !this.net?.table) return;
+    if (this.yanciOf !== null) { this.placeAsYanci(n); return; }
+    if (this.mySeat === null) { this.placeStanding(); return; }
+    if (!this.net?.table) return;
     const want = this.tableSeat(this.mySeat, n);
-    if (want === this.seat) return;
+    const wasStanding = this.yanciPlacedAt !== null;
+    this.yanciPlacedAt = null;
+    if (want === this.seat && !wasStanding && this.game.player.seat === want) return;
     const p = this.game.player;
     if (want.occupant && want.occupant !== p.id) {
       const npc = this.game.npcs.find((x) => x.c.seat === want);
@@ -319,13 +368,45 @@ export class OnlineSession implements GameHost {
 
   private relNames(g: OnlineGameId): string[] {
     const n = SEATS_OF[g];
-    return [...Array(n).keys()].map((rel) => (rel === 0 ? 'Sen' : this.room?.seats[toAbs(rel, this.mySeat ?? 0, n)]?.name ?? '?'));
+    const v = this.viewSeat ?? 0;
+    return [...Array(n).keys()].map((rel) => (rel === 0 && this.yanciOf === null ? 'Sen' : (this.room?.seats[toAbs(rel, v, n)]?.name ?? '?') + (rel === 0 ? ' (yancısısın)' : '')));
+  }
+
+  /** Yancı: sahibinin yanında ayakta durur, kamera sahibinin gözünden bakar */
+  private yanciPlacedAt: string | null = null;
+  private placeAsYanci(n: number) {
+    const owner = this.yanciOf!;
+    const ownerSeat = this.tableSeat(owner, n);
+    const key = `${ownerSeat.table.id}:${ownerSeat.index}`;
+    if (this.yanciPlacedAt === key) return;
+    this.yanciPlacedAt = key;
+    const p = this.game.player;
+    p.standUp();
+    const place = this.net?.yanciPlace(owner);
+    if (place) { p.pos.copy(place.pos); p.yaw = place.yaw; }
+    this.seat = ownerSeat;
+    this.game.world.reservedTable = ownerSeat.table.id;
+    this.game.rig.setFixed(...seatCamera(ownerSeat));
+    this.table3d.clear();
+    this.table3d = new TableView3D(ownerSeat);
+  }
+
+  /** Koltuksuz (henüz yancı değil): masanın yanında ayakta bekler */
+  private placeStanding() {
+    if (this.yanciPlacedAt === 'idle') return;
+    this.yanciPlacedAt = 'idle';
+    const p = this.game.player;
+    const t = this.seat.table;
+    p.standUp();
+    const away = this.seat.pos.clone().sub(t.center).setY(0).normalize();
+    p.pos.copy(this.seat.pos).addScaledVector(away, 0.7).setY(0);
+    p.yaw = Math.atan2(t.center.x - p.pos.x, t.center.z - p.pos.z);
   }
 
   /** Koltuklara müdavimleri yerleştir (arkadaşların karakterlerini ortak kahvehane katmanı yönetir) */
   private syncSeats() {
     const r = this.room;
-    if (!r || this.mySeat === null) return;
+    if (!r || this.viewSeat === null) return;
     const n = this.n();
     this.ensureMySeat(n);
     const keepBots = new Set<number>();
@@ -357,10 +438,10 @@ export class OnlineSession implements GameHost {
   }
 
   private charAtRel(rel: number): Character | null {
-    if (rel === 0) return this.game.player;
+    if (rel === 0 && this.yanciOf === null) return this.game.player;
     const r = this.room;
-    if (!r || this.mySeat === null) return null;
-    const abs = toAbs(rel, this.mySeat, this.n());
+    if (!r || this.viewSeat === null) return null;
+    const abs = toAbs(rel, this.viewSeat, this.n());
     const s = r.seats[abs];
     if (s?.occ === 'human' && s.player) return this.net?.charOf(s.player) ?? null;
     return this.bots.get(abs)?.c ?? null;
@@ -405,11 +486,11 @@ export class OnlineSession implements GameHost {
 
   /** Gelen kaos olayı: yalnızca görsel/sosyal */
   onChaos(m: Extract<ServerMsg, { t: 'chaos' }>) {
-    if (this.mySeat === null) return;
+    if (this.viewSeat === null) return;
     const n = this.n();
-    const fromRel = toRel(m.from, this.mySeat, n);
+    const fromRel = toRel(m.from, this.viewSeat, n);
     const from = this.charAtRel(fromRel);
-    const to = m.target !== undefined ? this.charAtRel(toRel(m.target, this.mySeat, n)) : null;
+    const to = m.target !== undefined ? this.charAtRel(toRel(m.target, this.viewSeat, n)) : null;
     if (!from) return;
     switch (m.kind) {
       case 'taunt': from.say(TAUNTS[m.phrase ?? 0] ?? '', 3); from.anim.play('point'); break;
@@ -418,6 +499,108 @@ export class OnlineSession implements GameHost {
       case 'tea': if (to) this.game.social.launch(from, to, () => { if (to === this.game.player) this.game.hud.toast(`💦 ${this.names[fromRel]} sana çay attı!`); }); break;
       case 'flip': this.game.chaosEvents.tableFlip(this.table, { c: from, id: `online-${m.from}` } as unknown as NPC); break;
     }
+  }
+
+  // ------------------------------------------------------------------ yancı modu
+  /** Yancının çubuğu: gizlice bak (basılı tut), yancılığı bırak, kalk */
+  private addYanciBar() {
+    this.yanciBar?.remove();
+    const bar = h('div', 'online-chaos yanci-bar');
+    const peek = btn('👀<span class="lb"> Gizlice bak (basılı tut)</span>', 'small accent', () => {});
+    peek.dataset.peek = '1';
+    const on = (e: Event) => { e.preventDefault(); this.client?.send({ t: 'peek', on: true }); peek.classList.add('down'); };
+    const off = () => { if (!peek.classList.contains('down')) return; peek.classList.remove('down'); this.client?.send({ t: 'peek', on: false }); };
+    peek.addEventListener('pointerdown', on);
+    for (const ev of ['pointerup', 'pointerleave', 'pointercancel']) peek.addEventListener(ev, off);
+    bar.append(peek, btn('🧍<span class="lb"> Yancılığı bırak</span>', 'small', () => this.client?.send({ t: 'yanci', seat: null })), btn('🚶<span class="lb"> Kalk, dolaş</span>', 'small', () => this.leaveTable()));
+    this.root.appendChild(bar);
+    this.yanciBar = bar;
+    this.ui?.el.classList.add('yanci-view');
+    // ıstakada taşa dokun → sahibine işaret
+    const rack = (this.ui as unknown as { rack?: { onSelect: () => void; selected: Set<number> } }).rack;
+    if (rack) rack.onSelect = () => {
+      const id = [...rack.selected][0];
+      rack.selected.clear();
+      if (id === undefined) return;
+      this.client?.send({ t: 'point', id });
+      this.toast('👆 Sahibine bu taşı gösterdin.');
+    };
+    this.peekPanel = h('div', 'peek-panel');
+    this.peekPanel.style.display = 'none';
+    this.root.appendChild(this.peekPanel);
+  }
+
+  /** Gizlice bakılan elin görünen taşları (yalnızca yancıda) */
+  private onPeekView(m: Extract<ServerMsg, { t: 'peekView' }>) {
+    const p = this.peekPanel;
+    if (!p) return;
+    const ctx = (this.ui as unknown as { s?: { ctx?: OkeyCtx } }).s?.ctx ?? null;
+    const who = this.room?.seats[m.seat]?.name ?? '?';
+    p.style.display = '';
+    p.innerHTML = `<div class="pk-title">👀 Gizlice bakıyorsun · ${who}: <b>${m.tiles.length}</b>/${m.total} taş gördün</div>`;
+    const row = h('div', 'pk-row');
+    for (const t of m.tiles as Tile[]) row.appendChild(tileEl(t, ctx, { small: true }));
+    p.appendChild(row);
+  }
+
+  /** Sahibi ve bakılan oyuncu için yancı rozetleri (+ tokat düğmesi) */
+  private renderBadges() {
+    const r = this.room;
+    if (!this.ui || !r || r.kind !== 'okey' || this.mySeat === null) { this.badges?.remove(); this.badges = null; return; }
+    const n = this.n();
+    const mine = r.watchers?.find((w) => w.yanci === this.mySeat && w.connected);
+    const peeker = r.watchers?.find((w) => w.connected && w.yanci !== null && peekTargetOf(w.yanci, n) === this.mySeat);
+    if (!mine && !peeker) { this.badges?.remove(); this.badges = null; return; }
+    if (!this.badges) { this.badges = h('div', 'yanci-badges'); this.root.appendChild(this.badges); }
+    const b = this.badges;
+    b.innerHTML = '';
+    if (mine) b.appendChild(h('div', 'yb', `🧍 <b>${mine.name}</b> yancın — taş gösterebilir`));
+    if (peeker) {
+      const owner = r.seats[peeker.yanci!]?.name ?? '?';
+      const d = h('div', `yb peeker${this.peekCueOn ? ' cue' : ''}`, `🧍 <b>${peeker.name}</b> yanında (yancı · ${owner})${this.peekCueOn ? ' — 👀 <b>ELİNE BAKIYOR!</b>' : ''}`);
+      const slap = btn('👋 Tokat at', 'small danger', () => this.client?.send({ t: 'catch' }));
+      slap.dataset.slap = '1';
+      d.appendChild(slap);
+      b.appendChild(d);
+    }
+  }
+
+  private onSlap(m: Extract<ServerMsg, { t: 'slap' }>) {
+    this.slaps.push({ by: m.by, yanci: m.yanci, ok: m.ok });
+    const n = this.n();
+    const by = this.viewSeat !== null ? this.charAtRel(toRel(m.by, this.viewSeat, n)) : null;
+    const y = this.net?.charOf(m.yanci) ?? null;
+    const meYanci = m.yanci === this.net?.you;
+    const meBy = m.by === this.mySeat;
+    if (by && y) { by.faceTowards(y.pos); by.anim.play('swing'); }
+    setTimeout(() => {
+      if (m.ok) {
+        sfx.play('slap');
+        this.game.rig.shake(meYanci ? 0.08 : 0.03, 0.2);
+        if (y) { y.anim.play('surprise'); y.anim.hitImpulse(0.9); y.say(pickLine(['Ay! Bakmıyordum ki!', 'Tamam tamam, bakmam!', 'Elim kaydı, gözüm kaydı!']), 2.2); }
+        by?.say(pickLine(['Gözünü elimden çek!', 'Yakaladım seni!', 'Yancılığını bil!']), 2.2);
+        if (meYanci) this.toast('👋 Yakalandın! Bu el bir daha bakamazsın.');
+        else if (meBy) this.toast('👋 Yakaladın! Yancı bu el bakamaz.');
+      } else {
+        sfx.play('whoosh');
+        by?.say(pickLine(['Hmm, bakmıyormuş...', 'Ben sandım ki...']), 2);
+        y?.say(pickLine(['Ne yaptım ben şimdi?', 'Masumum!']), 2);
+        if (meBy) this.toast('Boşa tokat! Bir süre tekrar atamazsın.');
+      }
+    }, 300);
+    if (meYanci && this.peekPanel) this.peekPanel.style.display = 'none';
+    this.peekCueOn = false;
+    this.renderBadges();
+  }
+
+  /** Yancım bir taşı işaret etti (yalnızca bende görünür) */
+  private onPoint(m: Extract<ServerMsg, { t: 'point' }>) {
+    const el = this.ui?.el.querySelector(`.rack [data-id="${m.id}"]`) as HTMLElement | null;
+    if (!el) return;
+    el.classList.add('pointed');
+    setTimeout(() => el.classList.remove('pointed'), 3000);
+    const who = this.room?.watchers?.find((w) => w.player === m.from)?.name ?? 'Yancın';
+    this.toast(`👆 ${who} bu taşı gösteriyor.`);
   }
 
   // ------------------------------------------------------------------ GameHost
@@ -448,6 +631,9 @@ export class OnlineSession implements GameHost {
     this.ui = null;
     this.uiGame = null;
     this.chaosBar = null;
+    this.yanciBar = null;
+    this.peekPanel = null;
+    this.badges = null;
     for (const npc of this.bots.values()) npc.releaseFromGame();
     this.bots.clear();
     this.table.props.visible = true;

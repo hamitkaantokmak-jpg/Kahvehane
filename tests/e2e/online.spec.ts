@@ -236,3 +236,45 @@ test('Ortak kahvehane: masadan kalkıp dolaşma, el sallama, çay ve kavga, maç
   await B.waitForFunction(() => (window as unknown as W).__game.net.avatars.size === 0, null, { timeout: 15_000 });
   for (const e of errs) expect(e.filter((x) => !x.includes('WebSocket'))).toEqual([]);
 });
+
+test('Yancı modu (okey): yancı sahibinin ıstakasını görür ve taş gösterir; sağdakine gizlice bakar, yakalanınca tokadı yer', async ({ browser }) => {
+  test.setTimeout(240_000);
+  const A = await newPage(browser);
+  const B = await newPage(browser);
+  const C = await newPage(browser);
+  const errs = [trackErrors(A), trackErrors(B), trackErrors(C)];
+  const code = await setupRoom(A, B, 'okey2');
+  // Can da katılır ve Ali'nin yancısı olur
+  await bootAt(C);
+  await C.evaluate((c) => (window as unknown as W).__game.joinRoom(c), code);
+  await C.locator('.online-panel .cr-name input').fill('Can');
+  await C.locator('.online-panel button:has-text("Katıl ▶")').click({ force: true });
+  await C.locator('.online-panel button[data-yanci="0"]').click({ force: true });
+  await expect(A.locator('.online-seats')).toContainText('Can yancı');
+  await A.locator('.online-panel button:has-text("Başlat")').click({ force: true });
+  await expect(C.locator('.gui.okey.yanci-view')).toBeVisible();
+  const ids = (p: Page) => p.evaluate(() => (window as unknown as W).__game.session.ui.s.hands[0].map((t: { id: number }) => t.id).sort((a: number, b: number) => a - b));
+  // yancı, Ali'nin elini görür
+  await C.waitForTimeout(800);
+  expect(await ids(C)).toEqual(await ids(A));
+  // taş gösterme: Ali'nin ıstakasında parlar
+  await C.locator('.rack .tile').first().click({ force: true });
+  await expect(A.locator('.rack .pointed')).toHaveCount(1, { timeout: 10_000 });
+  // Veli'nin ekranında yancı rozeti ve tokat düğmesi
+  await expect(B.locator('.yanci-badges')).toContainText('Can');
+  // gizlice bak: taşlar görünür, Veli'de 👀 uyarısı belirir
+  await C.locator('.yanci-bar button[data-peek]').dispatchEvent('pointerdown');
+  await expect(C.locator('.peek-panel .tile').first()).toBeVisible({ timeout: 10_000 });
+  await expect(C.locator('.peek-panel')).toContainText(/[2-9]\/\d+ taş/, { timeout: 10_000 });
+  await expect(B.locator('.yanci-badges .cue')).toBeVisible({ timeout: 10_000 });
+  // Veli tokat atar → yakalandı
+  await B.locator('.yanci-badges button[data-slap]').click({ force: true });
+  await C.waitForFunction(() => (window as unknown as W).__game.session.slaps.some((x: { ok: boolean }) => x.ok), null, { timeout: 15_000 });
+  await A.waitForFunction(() => (window as unknown as W).__game.session.slaps.some((x: { ok: boolean }) => x.ok), null, { timeout: 15_000 });
+  // bu el bir daha bakamaz
+  await C.locator('.yanci-bar button[data-peek]').dispatchEvent('pointerup');
+  await C.waitForTimeout(2500);
+  await C.locator('.yanci-bar button[data-peek]').dispatchEvent('pointerdown');
+  await C.waitForFunction(() => (window as unknown as W).__game.session.lastError.includes('yakalandın'), null, { timeout: 15_000 });
+  for (const e of errs) expect(e.filter((x) => !x.includes('WebSocket'))).toEqual([]);
+});
