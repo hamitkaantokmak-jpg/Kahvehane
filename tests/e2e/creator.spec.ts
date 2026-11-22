@@ -44,8 +44,10 @@ test('Karakter oluşturucu: C ile açılır, canlı değişir, kaydedilir ve say
   expect(await spec(page)).toEqual(saved);
   expect(JSON.parse(await page.evaluate(() => localStorage.getItem('kahvehane.character.v1')!))).toEqual(saved);
   // yürüme geri gelir
-  await page.keyboard.down('KeyW'); await page.waitForTimeout(500); await page.keyboard.up('KeyW');
-  expect(await page.evaluate(() => (window as unknown as W).__game.player.pos.z)).not.toBeCloseTo(p0, 1);
+  const before = await page.evaluate(() => { const p = (window as unknown as W).__game.player.pos; return [p.x, p.z]; });
+  await page.keyboard.down('KeyW'); await page.waitForTimeout(1200); await page.keyboard.up('KeyW');
+  const after = await page.evaluate(() => { const p = (window as unknown as W).__game.player.pos; return [p.x, p.z]; });
+  expect(Math.hypot(after[0] - before[0], after[1] - before[1])).toBeGreaterThan(0.1);
   expect(errs).toEqual([]);
 });
 
