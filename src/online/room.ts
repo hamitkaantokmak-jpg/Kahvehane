@@ -9,6 +9,7 @@
 import { sanitizeName, sanitizeSpec } from '../characters/creator';
 import type { CharacterSpec } from '../characters/CharacterSpec';
 import { ONLINE_ENGINES } from './games';
+import { Presence, SALON_EMOTES, SALON_TIMING, SalonState, addTension, cleanPresence, newSalon, onSalonTea, requestRace, tensionNow } from './salon';
 import {
   ChaosKind, ChaosPref, ClientMsg, DEFAULT_OPTIONS, GAMES_OF_KIND, GameAction, GameEvent, OnlineGameId, OnlineOptions, PROTOCOL_VERSION,
   ROOM_KINDS, RoomKind, RoomView, SEATS_OF, ServerMsg, TAUNTS,
@@ -49,6 +50,11 @@ export interface PlayerRec {
   teaAt: Record<number, number>;
   flipUsed: boolean;
   msgTimes: number[];
+  /** ortak kahvehane: son konum (yalnızca bellekte; kaydedilmese de olur) */
+  pos?: Presence;
+  posAt?: number;
+  emoteAt?: number;
+  salonTeaAt?: number;
 }
 
 export interface Out { to: string; msg: ServerMsg }
@@ -61,6 +67,10 @@ export interface RoomData {
   phase: 'lobby' | 'playing';
   /** masa türü (eski kayıtlarda yok → kart) */
   kind?: RoomKind;
+  /** odanın kurulduğu masa kimliği (örn. okey2) */
+  table?: string;
+  /** ortak kahvehane durumu (eski kayıtlarda yok) */
+  salon?: SalonState;
   game: OnlineGameId;
   options: OnlineOptions;
   state: unknown;
@@ -81,10 +91,11 @@ const PREFS: ChaosPref[] = ['calm', 'normal', 'chaos'];
 export class Room {
   d: RoomData;
 
-  constructor(code: string, seed: number, kind: RoomKind = 'kart') {
+  constructor(code: string, seed: number, kind: RoomKind = 'kart', table?: string) {
     if (!ROOM_KINDS.includes(kind)) kind = 'kart';
+    if (table !== undefined && !/^[a-z]+\d{1,2}$/.test(table)) table = undefined;
     this.d = {
-      code, rs: seed >>> 0, players: [], host: null, phase: 'lobby', kind, game: GAMES_OF_KIND[kind][0], options: { ...DEFAULT_OPTIONS }, state: null, seq: 0,
+      code, rs: seed >>> 0, players: [], host: null, phase: 'lobby', kind, ...(table ? { table } : {}), game: GAMES_OF_KIND[kind][0], options: { ...DEFAULT_OPTIONS }, state: null, seq: 0,
       lastEvent: null, nextActAt: 0, pauseUntil: 0, turnSince: 0, handOverAt: null, nextVotes: [], lastResult: null, idCounter: 0,
     };
   }
@@ -104,6 +115,7 @@ export class Room {
   private get engine() { return ONLINE_ENGINES[this.d.game]; }
   get kind(): RoomKind { return this.d.kind ?? 'kart'; }
   /** Masadaki koltuk sayısı (tavla masası 2 kişilik) */
+  get salon(): SalonState { return (this.d.salon ??= newSalon()); }
   get capacity() { return this.kind === 'tavla' ? 2 : MAX_SEATS; }
   private get seatCount() { return SEATS_OF[this.d.game]; }
   player(id: string) { return this.d.players.find((p) => p.id === id) ?? null; }
@@ -139,6 +151,11 @@ export class Room {
     const out: Out[] = [{ to: p.id, msg: { t: 'welcome', you: p.id, token: p.token, seat: p.seat, room: this.view() } }];
     out.push(...this.roomToAll(p.id));
     if (this.d.phase === 'playing') out.push(...this.stateTo([p]));
+    // ortak kahvehane: diğerlerinin konumu, gerginlik, yaklaşan maç gecesi
+    for (const o of this.d.players) if (o !== p && o.connected && o.pos) out.push({ to: p.id, msg: { t: 'pos', p: o.id, ...o.pos } });
+    out.push({ to: p.id, msg: { t: 'tension', v: Math.round(tensionNow(this.salon, now)) } });
+    const race = this.salon.race;
+    if (race && race.startAt > now) out.push({ to: p.id, msg: { t: 'race', seed: race.seed, in: race.startAt - now } });
     return { player: p.id, out };
   }
 
@@ -167,6 +184,7 @@ export class Room {
     const p = this.player(id);
     if (!p) return [];
     p.lastSeen = now;
+    if (m.t === 'pos') return this.onPos(p, m, now);
     p.msgTimes = p.msgTimes.filter((t) => now - t < RATE.window);
     if (p.msgTimes.length >= RATE.max) return [this.err(id, 'Çok hızlı! Biraz yavaş.')];
     p.msgTimes.push(now);
@@ -179,6 +197,9 @@ export class Room {
         case 'act': return this.onAct(p, m.a, now);
         case 'next': return this.onNext(p, now);
         case 'chaos': return this.onChaos(p, m.kind, m.target, m.phrase, now);
+        case 'emote': return this.onEmote(p, m.id, now);
+        case 'salonTea': return this.onSalonTea(p, m.target, now);
+        case 'race': return this.onRace(p, now);
         case 'pref': if (PREFS.includes(m.chaos)) p.chaos = m.chaos; return this.roomToAll(null);
         case 'mute': {
           if (typeof m.player !== 'string') return [];
@@ -317,9 +338,62 @@ export class Room {
     }
     if (kind === 'taunt' && (!Number.isInteger(phrase) || phrase! < 0 || phrase! >= TAUNTS.length)) return [this.err(p.id, 'Geçersiz söz.')];
     p.lastChaos = now;
+    const tension = this.tension(kind, now);
     const msg: ServerMsg = { t: 'chaos', from: p.seat, kind, ...(needsTarget ? { target } : {}), ...(kind === 'taunt' ? { phrase } : {}) };
     // susturanlara gitmez
-    return this.d.players.filter((x) => x.connected && !x.muted.includes(p.id)).map((x) => ({ to: x.id, msg }));
+    return [...this.d.players.filter((x) => x.connected && !x.muted.includes(p.id)).map((x) => ({ to: x.id, msg })), ...tension];
+  }
+
+  // ------------------------------------------------------------------ ortak kahvehane (yalnızca görsel/sosyal)
+  private toAll(msg: ServerMsg, except: string | null = null, from: string | null = null): Out[] {
+    return this.d.players.filter((x) => x.connected && x.id !== except && !(from && x.muted.includes(from))).map((x) => ({ to: x.id, msg }));
+  }
+
+  /** Gerginlik ekle; herkese yeni değer, dolduysa ortak olay */
+  private tension(kind: string, now: number): Out[] {
+    const r = addTension(this.salon, kind, now, this.rng);
+    const out = this.toAll({ t: 'tension', v: Math.round(r.value) });
+    if (r.event) out.push(...this.toAll({ t: 'event', id: r.event }));
+    return out;
+  }
+
+  private onPos(p: PlayerRec, m: Extract<ClientMsg, { t: 'pos' }>, now: number): Out[] {
+    if (now - (p.posAt ?? -1e9) < SALON_TIMING.posGap) return [];
+    const pos = cleanPresence(m);
+    if (!pos) return [];
+    const roamChanged = !!p.pos?.roam !== pos.roam;
+    p.pos = pos;
+    p.posAt = now;
+    const out = this.toAll({ t: 'pos', p: p.id, ...pos }, p.id);
+    if (roamChanged) out.push(...this.roomToAll(null));
+    return out;
+  }
+
+  private onEmote(p: PlayerRec, id: string, now: number): Out[] {
+    if (!(SALON_EMOTES as readonly string[]).includes(id)) return [this.err(p.id, 'Bilinmeyen hareket.')];
+    if (now - (p.emoteAt ?? -1e9) < SALON_TIMING.emoteGap) return [];
+    p.emoteAt = now;
+    return [...this.toAll({ t: 'emote', p: p.id, id: id as Extract<ServerMsg, { t: 'emote' }>['id'] }, p.id, p.id), ...this.tension(id === 'laf' ? 'laf' : 'emote', now)];
+  }
+
+  private onSalonTea(p: PlayerRec, target: string, now: number): Out[] {
+    const t = typeof target === 'string' ? this.player(target) : null;
+    if (!t || t === p || !t.connected) return [this.err(p.id, 'Çay atacak kimse yok.')];
+    if (p.chaos === 'calm') return [this.err(p.id, 'Sakin moddasın: çay fırlatma kapalı.')];
+    if (t.chaos === 'calm') return [this.err(p.id, `${t.name} sakin modda, çay atılamaz.`)];
+    if (now - (p.salonTeaAt ?? -1e9) < SALON_TIMING.salonTeaGap) return [this.err(p.id, 'Biraz bekle, daha yeni attın.')];
+    p.salonTeaAt = now;
+    const out = this.toAll({ t: 'salonTea', from: p.id, to: t.id });
+    const brawl = onSalonTea(this.salon, p.id, t.id, now);
+    out.push(...this.tension('salonTea', now));
+    if (brawl) { out.push(...this.toAll({ t: 'brawl', ids: brawl, ms: SALON_TIMING.brawlDuration })); out.push(...this.tension('brawl', now)); }
+    return out;
+  }
+
+  private onRace(p: PlayerRec, now: number): Out[] {
+    const r = requestRace(this.salon, now, this.rng);
+    if (!r) return [this.err(p.id, 'Maç gecesi daha yeni yapıldı; biraz sonra tekrar.')];
+    return this.toAll({ t: 'race', seed: r.seed, in: r.startAt - now });
   }
 
   // ------------------------------------------------------------------ zaman
@@ -364,10 +438,10 @@ export class Room {
   view(): RoomView {
     const n = this.d.phase === 'playing' ? this.seatCount : this.capacity;
     return {
-      code: this.d.code, host: this.d.host, phase: this.d.phase, kind: this.kind, game: this.d.game, options: { ...this.d.options }, lastResult: this.d.lastResult,
+      code: this.d.code, host: this.d.host, phase: this.d.phase, kind: this.kind, ...(this.d.table ? { table: this.d.table } : {}), game: this.d.game, options: { ...this.d.options }, lastResult: this.d.lastResult,
       seats: [...Array(n).keys()].map((s) => {
         const p = this.bySeat(s);
-        return p ? { occ: 'human', name: p.name, player: p.id, spec: p.spec, connected: p.connected, chaos: p.chaos } : { occ: 'bot', name: BOT_SEATS[s].name };
+        return p ? { occ: 'human', name: p.name, player: p.id, spec: p.spec, connected: p.connected, chaos: p.chaos, ...(p.pos?.roam ? { roam: true } : {}) } : { occ: 'bot', name: BOT_SEATS[s].name };
       }),
     };
   }

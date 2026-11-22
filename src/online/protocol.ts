@@ -8,6 +8,7 @@
  * - Para tamamen oyun içi ve sanaldır; çevrimiçi masada bahis yoktur.
  */
 import type { CharacterSpec } from '../characters/CharacterSpec';
+import type { SalonEmote, SharedEvent } from './salon';
 
 export const PROTOCOL_VERSION = 1;
 
@@ -84,7 +85,12 @@ export type ClientMsg =
   | { t: 'chaos'; kind: ChaosKind; target?: number; phrase?: number }
   | { t: 'pref'; chaos: ChaosPref }
   | { t: 'mute'; player: string; on: boolean }
-  | { t: 'ping' };
+  | { t: 'ping' }
+  // ortak kahvehane (2. aşama)
+  | { t: 'pos'; x: number; z: number; yaw: number; m: boolean; roam: boolean }
+  | { t: 'emote'; id: SalonEmote }
+  | { t: 'salonTea'; target: string }
+  | { t: 'race' };
 
 export interface SeatView {
   occ: 'human' | 'bot' | 'empty';
@@ -93,6 +99,8 @@ export interface SeatView {
   spec?: CharacterSpec;
   connected?: boolean;
   chaos?: ChaosPref;
+  /** masadan kalkmış, salonda dolaşıyor */
+  roam?: boolean;
 }
 
 export interface RoomView {
@@ -100,6 +108,8 @@ export interface RoomView {
   host: string | null;
   phase: 'lobby' | 'playing';
   kind: RoomKind;
+  /** odanın kurulduğu masa (herkes aynı masaya oturur) */
+  table?: string;
   game: OnlineGameId;
   options: OnlineOptions;
   seats: SeatView[];
@@ -113,7 +123,14 @@ export type ServerMsg =
   | { t: 'state'; seq: number; game: OnlineGameId; seat: number; view: unknown; event: GameEvent | null }
   | { t: 'chaos'; from: number; kind: ChaosKind; target?: number; phrase?: number }
   | { t: 'error'; msg: string }
-  | { t: 'pong' };
+  | { t: 'pong' }
+  | { t: 'pos'; p: string; x: number; z: number; yaw: number; m: boolean; roam: boolean }
+  | { t: 'emote'; p: string; id: SalonEmote }
+  | { t: 'salonTea'; from: string; to: string }
+  | { t: 'brawl'; ids: string[]; ms: number }
+  | { t: 'tension'; v: number }
+  | { t: 'event'; id: SharedEvent }
+  | { t: 'race'; seed: number; in: number };
 
 /** Son hamlenin özeti (istemci animasyon/tepki için) */
 export interface GameEvent {
