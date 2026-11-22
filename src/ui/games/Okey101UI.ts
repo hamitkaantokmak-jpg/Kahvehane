@@ -11,17 +11,17 @@ import { OkeyTable } from './OkeyTable';
 export class Okey101UI implements GameUI {
   readonly el: HTMLDivElement;
   s: K.Okey101State;
-  private rng = createRng();
+  protected rng = createRng();
   rack = new Rack();
-  private alive = true;
-  private botTimer = 0;
-  private status!: HTMLDivElement;
-  private table!: OkeyTable;
-  private btns!: HTMLDivElement;
+  protected alive = true;
+  protected botTimer = 0;
+  protected status!: HTMLDivElement;
+  protected table!: OkeyTable;
+  protected btns!: HTMLDivElement;
   /** Hazırlanan perler (taş id grupları) */
-  private staged: number[][] = [];
+  protected staged: number[][] = [];
 
-  constructor(private host: GameHost, hands: number, doubling = false) {
+  constructor(protected host: GameHost, hands: number, doubling = false) {
     this.el = h('div', 'gui okey okey101');
     this.s = K.newMatch101(this.rng, { hands, doubling }, 0);
     this.rack.multiSelect = true;
@@ -54,10 +54,10 @@ export class Okey101UI implements GameUI {
     this.el.remove();
   }
 
-  private get myTurn() { return this.s.current === 0 && this.s.phase !== 'ended'; }
+  protected get myTurn() { return this.s.current === 0 && this.s.phase !== 'ended'; }
 
   // ------------------------------------------------------------ botlar
-  private pump() {
+  protected pump() {
     if (!this.alive || this.s.phase === 'ended' || this.host.isHuman(this.s.current)) return;
     // masadan kalkan (kavgadaki) oyuncu varsa bot sırası bekler
     if (this.host.paused) { clearTimeout(this.botTimer); this.botTimer = later(() => this.pump(), 600); return; }
@@ -121,11 +121,11 @@ export class Okey101UI implements GameUI {
   }
 
   // ------------------------------------------------------------ insan
-  private tilesOf(ids: number[]): Tile[] {
+  protected tilesOf(ids: number[]): Tile[] {
     return ids.map((id) => this.s.hands[0].find((t) => t.id === id)!).filter(Boolean);
   }
 
-  private drawDeck() {
+  protected drawDeck() {
     const s = this.s;
     if (!this.myTurn || s.phase !== 'draw') return;
     const t = K.drawDeck101(s, 0);
@@ -134,7 +134,7 @@ export class Okey101UI implements GameUI {
     this.after();
   }
 
-  private drawLeft() {
+  protected drawLeft() {
     const s = this.s;
     if (!this.myTurn || s.phase !== 'draw' || !s.discards[3].length) return;
     K.drawDiscard101(s, 0);
@@ -143,7 +143,7 @@ export class Okey101UI implements GameUI {
     this.after();
   }
 
-  private stageSelected() {
+  protected stageSelected() {
     const ids = [...this.rack.selected];
     if (!ids.length) { this.host.toast('Önce ıstakadan taş seç (tıklayarak).'); return; }
     const tiles = this.tilesOf(ids);
@@ -157,7 +157,7 @@ export class Okey101UI implements GameUI {
     this.render();
   }
 
-  private stagedInfo() {
+  protected stagedInfo() {
     let melds = 0, pairs = 0, value = 0;
     for (const g of this.staged) {
       const tiles = this.tilesOf(g);
@@ -167,7 +167,7 @@ export class Okey101UI implements GameUI {
     return { melds, pairs, value };
   }
 
-  private commitStaged() {
+  protected commitStaged() {
     const s = this.s;
     if (!this.myTurn || s.phase !== 'play') { this.host.toast(s.phase === 'draw' ? 'Önce taş çek.' : 'Sıra sende değil.'); return; }
     if (!this.staged.length) return;
@@ -191,7 +191,7 @@ export class Okey101UI implements GameUI {
     this.after();
   }
 
-  private addToMeld(meldId: number) {
+  protected addToMeld(meldId: number) {
     const s = this.s;
     const ids = [...this.rack.selected];
     if (!this.myTurn || s.phase !== 'play') return;
@@ -215,7 +215,7 @@ export class Okey101UI implements GameUI {
     this.after();
   }
 
-  private discard(id: number, confirmed = false) {
+  protected discard(id: number, confirmed = false) {
     const s = this.s;
     const err = K.canDiscard101(s, 0);
     if (err) { this.host.toast(err); return; }
@@ -232,7 +232,11 @@ export class Okey101UI implements GameUI {
       this.el.appendChild(m);
       return;
     }
-    const r = K.discard101(s, 0, id);
+    this.sendDiscard(id);
+  }
+
+  protected sendDiscard(id: number) {
+    const r = K.discard101(this.s, 0, id);
     this.host.sfx('tile');
     if (r.penalty) this.host.toast(`+${r.penalty} ceza yazıldı!`);
     this.staged = [];
@@ -240,7 +244,14 @@ export class Okey101UI implements GameUI {
     this.after();
   }
 
-  private after() {
+  protected doReturn() { K.returnDiscard101(this.s, 0); this.after(); }
+
+  protected newMatchLabel = 'Yeni seri';
+  protected resetRack() { this.staged = []; this.rack.slots.fill(null); this.rack.sync(this.s.hands[0], this.s.ctx); this.rack.arrangeMelds(K.RULES_101); }
+  protected onNextHand() { K.nextHand101(this.s, this.rng); this.resetRack(); this.render(); this.host.sfx('deal'); this.pump(); }
+  protected onNewMatch() { this.s = K.newMatch101(this.rng, this.s.options, 0); this.resetRack(); this.render(); this.pump(); }
+
+  protected after() {
     this.staged = this.staged.filter((g) => g.every((id) => this.s.hands[0].some((t) => t.id === id)));
     this.rack.sync(this.s.hands[0], this.s.ctx);
     this.render();
@@ -249,12 +260,12 @@ export class Okey101UI implements GameUI {
   }
 
   // ------------------------------------------------------------ çizim
-  private sync3d() {
+  protected sync3d() {
     const s = this.s;
     this.host.table3d.syncOkey({ hands: [s.hands[0]], handCounts: s.hands.map((x) => x.length), rackOrder: this.rack.slots, deckCount: s.deck.length, deckIds: s.deck.map((t) => t.id), indicator: s.indicator, ctx: s.ctx, discards: s.discards, melds: s.table.map((m) => ({ owner: m.owner, tiles: m.tiles })) });
   }
 
-  private render() {
+  protected render() {
     this.sync3d();
     const s = this.s;
     const names = this.host.names;
@@ -274,7 +285,7 @@ export class Okey101UI implements GameUI {
   }
 
   /** Masa (her oyuncunun önü, köşelerdeki atılan taşlar, deste) */
-  private renderTable() {
+  protected renderTable() {
     const s = this.s;
     const names = this.host.names;
     const live = s.phase !== 'ended';
@@ -302,7 +313,7 @@ export class Okey101UI implements GameUI {
     });
   }
 
-  private renderButtons() {
+  protected renderButtons() {
     const s = this.s;
     this.btns.innerHTML = '';
     const play = this.myTurn && s.phase === 'play';
@@ -317,11 +328,11 @@ export class Okey101UI implements GameUI {
       this.btns.appendChild(btn(`${label} ✔`, play && ok ? 'primary glow' : 'primary disabled', () => this.commitStaged()));
     }
     this.btns.appendChild(btn('At', play && sel.length === 1 ? 'primary' : 'primary disabled', () => sel.length === 1 && this.discard(sel[0])));
-    if (play && s.takenDiscard !== null && !s.actedThisTurn) this.btns.appendChild(btn('Geri koy', 'small', () => { K.returnDiscard101(s, 0); this.after(); }));
+    if (play && s.takenDiscard !== null && !s.actedThisTurn) this.btns.appendChild(btn('Geri koy', 'small', () => this.doReturn()));
     this.btns.appendChild(btn('Kalk', 'ghost small', () => this.host.exit()));
   }
 
-  private onHandEnd() {
+  protected onHandEnd() {
     const s = this.s;
     const r = s.result!;
     const names = this.host.names;
@@ -337,10 +348,10 @@ export class Okey101UI implements GameUI {
       <p class="muted">Düşük puan iyidir. El ${s.handNo}/${s.options.hands}</p>
       ${s.matchOver ? `<h3>${mw === 0 ? '🏆 Seriyi KAZANDIN!' : `🏆 Seriyi ${names[mw]} kazandı`}</h3>` : ''}</div>`;
     const row = h('div', 'row-btns');
-    if (!s.matchOver) row.appendChild(btn('Sonraki el ▶', 'primary', () => { m.remove(); K.nextHand101(s, this.rng); this.staged = []; this.rack.slots.fill(null); this.rack.sync(s.hands[0], s.ctx); this.rack.arrangeMelds(K.RULES_101); this.render(); this.host.sfx('deal'); this.pump(); }));
+    if (!s.matchOver) row.appendChild(btn('Sonraki el ▶', 'primary', () => { m.remove(); this.onNextHand(); }));
     else {
       this.host.matchFinished(mw === 0);
-      row.appendChild(btn('Yeni seri', 'primary', () => { m.remove(); this.s = K.newMatch101(this.rng, s.options, 0); this.staged = []; this.rack.slots.fill(null); this.rack.sync(this.s.hands[0], this.s.ctx); this.rack.arrangeMelds(K.RULES_101); this.render(); this.pump(); }));
+      row.appendChild(btn(this.newMatchLabel, 'primary', () => { m.remove(); this.onNewMatch(); }));
     }
     row.appendChild(btn('Masadan kalk', 'ghost', () => this.host.exit()));
     m.querySelector('.panel')!.appendChild(row);

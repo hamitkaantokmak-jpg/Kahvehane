@@ -11,9 +11,15 @@ import type { CharacterSpec } from '../characters/CharacterSpec';
 
 export const PROTOCOL_VERSION = 1;
 
-export type OnlineGameId = 'batak' | 'king' | 'pisti2' | 'pisti4';
-export const ONLINE_GAMES: OnlineGameId[] = ['batak', 'king', 'pisti4', 'pisti2'];
-export const SEATS_OF: Record<OnlineGameId, number> = { batak: 4, king: 4, pisti4: 4, pisti2: 2 };
+export type OnlineGameId = 'batak' | 'king' | 'pisti2' | 'pisti4' | 'okey' | 'okey101' | 'tavla';
+export const ONLINE_GAMES: OnlineGameId[] = ['batak', 'king', 'pisti4', 'pisti2', 'okey', 'okey101', 'tavla'];
+export const SEATS_OF: Record<OnlineGameId, number> = { batak: 4, king: 4, pisti4: 4, pisti2: 2, okey: 4, okey101: 4, tavla: 2 };
+
+/** Oda bir masa türüne bağlıdır (kart, okey ya da tavla masası); oda sahibi yalnızca o masanın oyunlarını seçebilir */
+export type RoomKind = 'kart' | 'okey' | 'tavla';
+export const ROOM_KINDS: RoomKind[] = ['kart', 'okey', 'tavla'];
+export const GAMES_OF_KIND: Record<RoomKind, OnlineGameId[]> = { kart: ['batak', 'king', 'pisti4', 'pisti2'], okey: ['okey', 'okey101'], tavla: ['tavla'] };
+export const kindOfGame = (g: OnlineGameId): RoomKind => (ROOM_KINDS.find((k) => GAMES_OF_KIND[k].includes(g)) ?? 'kart');
 
 export type ChaosPref = 'calm' | 'normal' | 'chaos';
 export type ChaosKind = 'objection' | 'slam' | 'tea' | 'flip' | 'taunt';
@@ -36,16 +42,37 @@ export interface OnlineOptions {
   batakZeroPenalty: boolean;
   kingShort: boolean;
   pistiTarget: number;
+  okey101Hands: number;
+  okey101Doubling: boolean;
+  tavlaTarget: number;
+  tavlaKatmerli: boolean;
   difficulty: 'easy' | 'medium' | 'hard';
 }
-export const DEFAULT_OPTIONS: OnlineOptions = { batakPartners: false, batakHands: 5, batakZeroPenalty: false, kingShort: true, pistiTarget: 101, difficulty: 'medium' };
+export const DEFAULT_OPTIONS: OnlineOptions = { batakPartners: false, batakHands: 5, batakZeroPenalty: false, kingShort: true, pistiTarget: 101, okey101Hands: 3, okey101Doubling: false, tavlaTarget: 5, tavlaKatmerli: true, difficulty: 'medium' };
 
 /** Oyun hamleleri (oyuna göre) */
 export type GameAction =
   | { k: 'bid'; b: number | 'pass' }
   | { k: 'trump'; suit: 0 | 1 | 2 | 3 }
   | { k: 'contract'; c: string }
-  | { k: 'play'; id: number };
+  | { k: 'play'; id: number }
+  // okey / 101
+  | { k: 'draw'; from: 'deck' | 'left' }
+  | { k: 'discard'; id: number }
+  | { k: 'finish'; id: number }
+  | { k: 'indicator' }
+  | { k: 'return' }
+  | { k: 'returnDraw' }
+  | { k: 'open'; mode: 'melds' | 'pairs'; groups: number[][] }
+  | { k: 'lay'; ids: number[] }
+  | { k: 'add'; id: number; meld: number }
+  | { k: 'swap'; id: number; meld: number }
+  // tavla
+  | { k: 'opening' }
+  | { k: 'roll' }
+  | { k: 'move'; from: number | 'bar'; to: number | 'off' }
+  | { k: 'undo' }
+  | { k: 'end' };
 
 export type ClientMsg =
   | { t: 'hello'; v: number; name: string; spec: unknown; chaos: ChaosPref; token?: string }
@@ -72,6 +99,7 @@ export interface RoomView {
   code: string;
   host: string | null;
   phase: 'lobby' | 'playing';
+  kind: RoomKind;
   game: OnlineGameId;
   options: OnlineOptions;
   seats: SeatView[];
@@ -95,6 +123,10 @@ export interface GameEvent {
   winner?: number | null;
   handOver?: boolean;
   pisti?: number;
+  /** 101: atışta yazılan ceza */
+  penalty?: number;
+  /** tavla: pul kırıldı */
+  hit?: boolean;
 }
 
 /** Kısa oda kodu: karışabilecek harfler (I, O, 0, 1) yok */

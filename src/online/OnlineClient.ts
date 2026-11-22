@@ -4,7 +4,7 @@
  */
 import { ClientMsg, PROTOCOL_VERSION, ServerMsg, isCode } from './protocol';
 import type { CharacterSpec } from '../characters/CharacterSpec';
-import type { ChaosPref } from './protocol';
+import type { ChaosPref, RoomKind } from './protocol';
 
 export const DEFAULT_SERVER = 'https://kahvehane.hamitkaantokmak.workers.dev';
 
@@ -21,20 +21,29 @@ const tokenOf = (code: string) => { try { return sessionStorage.getItem(TOKEN_KE
 const saveToken = (code: string, t: string) => { try { sessionStorage.setItem(TOKEN_KEY(code), t); } catch { /* yok */ } };
 
 /** Yeni oda kur → oda kodu */
-export async function createRoom(): Promise<string> {
-  const r = await fetch(`${serverUrl()}/rooms`, { method: 'POST' });
+export async function createRoom(kind: RoomKind = 'kart'): Promise<string> {
+  const r = await fetch(`${serverUrl()}/rooms?kind=${kind}`, { method: 'POST' });
   const j = (await r.json()) as { code?: string; error?: string };
   if (!r.ok || !j.code) throw new Error(j.error ?? 'Oda kurulamadı.');
   return j.code;
 }
 
-/** Oda var mı */
-export async function roomExists(code: string): Promise<boolean> {
-  if (!isCode(code)) return false;
+export interface RoomInfo { exists: boolean; kind: RoomKind; phase?: string; game?: string; humans?: number }
+
+/** Oda bilgisi (yoksa null). Eski sunucu masa türü yollamazsa kart masası sayılır. */
+export async function roomInfo(code: string): Promise<RoomInfo | null> {
+  if (!isCode(code)) return null;
   try {
     const r = await fetch(`${serverUrl()}/rooms/${code}`);
-    return r.ok && ((await r.json()) as { exists?: boolean }).exists === true;
-  } catch { return false; }
+    if (!r.ok) return null;
+    const j = (await r.json()) as Partial<RoomInfo>;
+    return j.exists ? { ...j, exists: true, kind: j.kind ?? 'kart' } : null;
+  } catch { return null; }
+}
+
+/** Oda var mı */
+export async function roomExists(code: string): Promise<boolean> {
+  return (await roomInfo(code)) !== null;
 }
 
 type Listener = (m: ServerMsg) => void;
