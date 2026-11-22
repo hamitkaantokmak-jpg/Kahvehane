@@ -37,6 +37,18 @@ import { LocalEconomyStore } from '../economy/store';
 import { WORK_PAY, dayNumber } from '../economy/Economy';
 import { stainIntensity, isStained } from '../interactions/teaThrow';
 
+/**
+ * Masaya oturunca kamera: oyuncunun arkasından ve yukarıdan masaya bakış. Kamera yandaki koltuklara fazla yakın olursa
+ * komşuların kafaları ekranın üstünü kaplar; bu yüzden yeterince geride ve yüksekte durur (karşıdakiler görünür kalır).
+ */
+export function seatCamera(seat: Seat): [THREE.Vector3, THREE.Vector3] {
+  const back = new THREE.Vector3(-Math.sin(seat.yaw), 0, -Math.cos(seat.yaw));
+  const camPos = seat.pos.clone().addScaledVector(back, SEAT_CAM.back).add(new THREE.Vector3(0, SEAT_CAM.height, 0));
+  const look = seat.table.center.clone().addScaledVector(back, SEAT_CAM.lookShift).add(new THREE.Vector3(0, SEAT_CAM.lookY, 0));
+  return [camPos, look];
+}
+export const SEAT_CAM = { back: 0.75, height: 2.35, lookShift: -0.1, lookY: 0.9 };
+
 export class Game {
   readonly renderer: THREE.WebGLRenderer;
   readonly scene = new THREE.Scene();
@@ -619,11 +631,7 @@ export class Game {
     this.hud.setPrompt(null);
     this.world.reservedTable = seat.table.id;
     // kamera: oyuncunun arkasından masaya bakış
-    const back = new THREE.Vector3(-Math.sin(seat.yaw), 0, -Math.cos(seat.yaw));
-    // oyuncunun başının üstünden masaya bakış; masa ekranın üst yarısında kalsın (alt yarıda arayüz var)
-    const camPos = seat.pos.clone().addScaledVector(back, 0.15).add(new THREE.Vector3(0, 1.8, 0));
-    const look = seat.table.center.clone().addScaledVector(back, -0.25).add(new THREE.Vector3(0, 0.3, 0));
-    this.rig.setFixed(camPos, look);
+    this.rig.setFixed(...seatCamera(seat));
     this.session = online ? new OnlineSession(this, seat, online) : new TableSession(this, seat);
   }
 
