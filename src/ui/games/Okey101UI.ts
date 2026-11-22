@@ -293,7 +293,7 @@ export class Okey101UI implements GameUI {
     const info = this.staged.length ? this.stagedInfo() : null;
     const oneSel = this.myTurn && s.phase === 'play' && s.opened[0] !== 'none' && this.rack.selected.size === 1;
     this.table.render({
-      seats: s.hands.map((hand, i) => ({ name: i === 0 ? 'Sen' : names[i], count: hand.length, meta: `${openTxt(s.opened[i])} · <b>${s.totals[i]}</b>`, turn: live && s.current === i, opened: s.opened[i] !== 'none' })),
+      seats: s.hands.map((hand, i) => ({ name: names[i] ?? 'Sen', count: hand.length, meta: `${openTxt(s.opened[i])} · <b>${s.totals[i]}</b>`, turn: live && s.current === i, opened: s.opened[i] !== 'none' })),
       discards: s.discards,
       ctx: s.ctx,
       indicator: s.indicator,

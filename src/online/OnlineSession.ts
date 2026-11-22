@@ -369,7 +369,7 @@ export class OnlineSession implements GameHost {
   private relNames(g: OnlineGameId): string[] {
     const n = SEATS_OF[g];
     const v = this.viewSeat ?? 0;
-    return [...Array(n).keys()].map((rel) => (rel === 0 && this.yanciOf === null ? 'Sen' : (this.room?.seats[toAbs(rel, v, n)]?.name ?? '?') + (rel === 0 ? ' (yancısısın)' : '')));
+    return [...Array(n).keys()].map((rel) => (rel === 0 && this.yanciOf === null ? 'Sen' : (this.room?.seats[toAbs(rel, v, n)]?.name ?? '?')));
   }
 
   /** Yancı: sahibinin yanında ayakta durur, kamera sahibinin gözünden bakar */
@@ -558,7 +558,7 @@ export class OnlineSession implements GameHost {
     if (peeker) {
       const owner = r.seats[peeker.yanci!]?.name ?? '?';
       const d = h('div', `yb peeker${this.peekCueOn ? ' cue' : ''}`, `🧍 <b>${peeker.name}</b> yanında (yancı · ${owner})${this.peekCueOn ? ' — 👀 <b>ELİNE BAKIYOR!</b>' : ''}`);
-      const slap = btn('👋 Tokat at', 'small danger', () => this.client?.send({ t: 'catch' }));
+      const slap = btn('👋 Tokat at', 'small accent', () => this.client?.send({ t: 'catch' }));
       slap.dataset.slap = '1';
       d.appendChild(slap);
       b.appendChild(d);
@@ -595,10 +595,16 @@ export class OnlineSession implements GameHost {
 
   /** Yancım bir taşı işaret etti (yalnızca bende görünür) */
   private onPoint(m: Extract<ServerMsg, { t: 'point' }>) {
-    const el = this.ui?.el.querySelector(`.rack [data-id="${m.id}"]`) as HTMLElement | null;
-    if (!el) return;
-    el.classList.add('pointed');
-    setTimeout(() => el.classList.remove('pointed'), 3000);
+    // ıstaka her durumda yeniden çizildiği için işaret 3 sn boyunca tekrar uygulanır
+    const until = performance.now() + 3000;
+    const apply = () => {
+      if (!this.ui) return;
+      this.ui.el.querySelectorAll('.rack .pointed').forEach((x) => x.classList.remove('pointed'));
+      if (performance.now() > until) return;
+      (this.ui.el.querySelector(`.rack [data-id="${m.id}"]`) as HTMLElement | null)?.classList.add('pointed');
+      window.setTimeout(apply, 150);
+    };
+    apply();
     const who = this.room?.watchers?.find((w) => w.player === m.from)?.name ?? 'Yancın';
     this.toast(`👆 ${who} bu taşı gösteriyor.`);
   }
