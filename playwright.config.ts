@@ -12,6 +12,11 @@ export default defineConfig({
     viewport: { width: 1280, height: 720 },
     launchOptions: { args: ['--use-gl=angle', '--use-angle=swiftshader', '--enable-unsafe-swiftshader'] },
   },
+  projects: [
+    { name: 'yerel', testIgnore: /online\.spec\.ts/ },
+    // çevrimiçi testler (iki tarayıcı + oda sunucusu) yerel testlerden sonra, tek dosyada sırayla
+    { name: 'cevrimici', testMatch: /online\.spec\.ts/, dependencies: ['yerel'] },
+  ],
   webServer: [
     {
       command: 'npx vite --port 5174 --strictPort',
