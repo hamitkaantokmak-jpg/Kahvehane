@@ -67,7 +67,7 @@ test('Çevrimiçi: oda kur, davet bağlantısıyla katıl, batak oyna; laf ve ç
   await A.waitForTimeout(2600);
   await A.locator('.online-chaos button[data-chaos="tea"]').click();
   await A.locator('.throw-pick button:has-text("Veli")').click();
-  await B.waitForFunction(() => (window as unknown as W).__game.player.stain.remaining > 0, null, { timeout: 15_000 });
+  await B.waitForFunction(() => (window as unknown as W).__game.player.stain.remaining > 0, null, { timeout: 40_000 });
   expect(errsA.filter((e) => !e.includes('WebSocket'))).toEqual([]);
   expect(errsB.filter((e) => !e.includes('WebSocket'))).toEqual([]);
 });

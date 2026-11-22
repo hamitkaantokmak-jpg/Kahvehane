@@ -40,7 +40,7 @@ for (const players of [2, 4] as const) {
     // kart korunumu
     expect(await withUI(page, 'return s.captured.flat().length')).toBe(52);
     // maç sonu: hedefi düşür, bir el daha oyna
-    await withUI(page, 's.options.target = 1;');
+    await withUI(page, 's.options.target = 1; s.totals[0] += 1000;');   // eşitlikte maç sürer; eşitliği önle
     await modal.locator('button:has-text("Sonraki el")').click();
     await playUntilHandEnd(page);
     await expect(page.locator('.modal')).toContainText('Maçı');
