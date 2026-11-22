@@ -5,9 +5,11 @@
  */
 import { Room, Out } from '../src/online/room';
 import { ROOM_KINDS, RoomKind, isCode, makeCode, parseClientMsg } from '../src/online/protocol';
+import { Conn, PresenceClientMsg, PresenceServerMsg, cleanFriends, invite, isFriendCode, makeFriendCode, statusFor, updatesFor } from '../src/online/friends';
 
 export interface Env {
   ROOMS: DurableObjectNamespace;
+  PRESENCE: DurableObjectNamespace;
 }
 
 /** Bağlantı kabul edilen adresler: yayındaki site ve yerel geliştirme */
@@ -33,6 +35,13 @@ export default {
     const origin = req.headers.get('Origin');
     if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: cors(origin) });
     if (url.pathname === '/health') return json({ ok: true }, 200, origin);
+
+    // arkadaş listesi / kim çevrimiçi (tek nesne)
+    if (url.pathname === '/presence') {
+      if (req.headers.get('Upgrade') !== 'websocket') return json({ error: 'websocket bekleniyor' }, 426, origin);
+      if (!originOk(origin)) return json({ error: 'izin yok' }, 403, origin);
+      return env.PRESENCE.get(env.PRESENCE.idFromName('global')).fetch(req);
+    }
 
     // oda kur
     if (url.pathname === '/rooms' && req.method === 'POST') {
@@ -182,4 +191,97 @@ export class RoomDO implements DurableObject {
     await this.save();
     await this.schedule();
   }
+}
+
+// ====================================================================== arkadaş listesi
+const sha256 = async (t: string) => [...new Uint8Array(await crypto.subtle.digest('SHA-256', new TextEncoder().encode(t)))].map((b) => b.toString(16).padStart(2, '0')).join('');
+const randHex = (n: number) => [...crypto.getRandomValues(new Uint8Array(n))].map((b) => b.toString(16).padStart(2, '0')).join('');
+
+/** Arkadaş kodlarını (gizli anahtarın özetiyle) saklar; kimin çevrimiçi olduğunu açık bağlantılardan bilir. */
+export class PresenceDO implements DurableObject {
+  constructor(private ctx: DurableObjectState, _env: Env) {}
+
+  async fetch(req: Request): Promise<Response> {
+    if (req.headers.get('Upgrade') !== 'websocket') return new Response('websocket bekleniyor', { status: 426 });
+    const pair = new WebSocketPair();
+    this.ctx.acceptWebSocket(pair[1]);
+    pair[1].serializeAttachment(null);
+    return new Response(null, { status: 101, webSocket: pair[0] });
+  }
+
+  /** Açık bağlantılar ve durumları (merhaba demiş olanlar) */
+  private conns(): { ws: WebSocket; c: Conn }[] {
+    return this.ctx.getWebSockets().map((ws) => ({ ws, c: ws.deserializeAttachment() as Conn | null })).filter((x): x is { ws: WebSocket; c: Conn } => !!x.c);
+  }
+
+  private send(ws: WebSocket, m: PresenceServerMsg) { try { ws.send(JSON.stringify(m)); } catch { /* kapanmış */ } }
+
+  private dispatch(list: { ws: WebSocket; c: Conn }[], out: { to: number; msg: PresenceServerMsg }[]) {
+    for (const o of out) this.send(list[o.to].ws, o.msg);
+  }
+
+  private notify(code: string) {
+    const list = this.conns();
+    this.dispatch(list, updatesFor(list.map((x) => x.c), code));
+  }
+
+  async webSocketMessage(ws: WebSocket, data: string | ArrayBuffer) {
+    if (typeof data !== 'string' || data.length > 8192) return;
+    let m: PresenceClientMsg;
+    try { m = JSON.parse(data); } catch { return; }
+    const name = (x: unknown) => String(x ?? '').replace(/[<>&"']/g, '').trim().slice(0, 16) || 'Misafir';
+    let c = ws.deserializeAttachment() as Conn | null;
+    if (!c) {
+      if (m.t !== 'hello') { ws.close(1008, 'önce hello'); return; }
+      let code = m.code, secret = m.secret;
+      const known = isFriendCode(code) && typeof secret === 'string' ? await this.ctx.storage.get<string>(`c:${code}`) : undefined;
+      if (!known || known !== (await sha256(secret!))) {
+        // yeni kimlik (ya da anahtar tutmadı): yeni kod ver
+        for (let i = 0; i < 10; i++) { code = makeFriendCode(() => crypto.getRandomValues(new Uint32Array(1))[0] / 2 ** 32); if (!(await this.ctx.storage.get(`c:${code}`))) break; }
+        secret = randHex(16);
+        await this.ctx.storage.put(`c:${code}`, await sha256(secret));
+        this.send(ws, { t: 'me', code: code!, secret });
+      }
+      c = { code: code!, name: name(m.name), friends: cleanFriends(m.friends), invisible: !!m.invisible, room: null };
+      ws.serializeAttachment(c);
+      const list = this.conns().map((x) => x.c);
+      this.send(ws, { t: 'friends', list: c.friends.map((f) => statusFor(list, f, c!.code)) });
+      this.notify(c.code);
+      return;
+    }
+    if (m.t === 'friends') {
+      c.friends = cleanFriends(m.list);
+      ws.serializeAttachment(c);
+      const list = this.conns().map((x) => x.c);
+      this.send(ws, { t: 'friends', list: c.friends.map((f) => statusFor(list, f, c!.code)) });
+      // listesine eklediklerim artık beni görebilir
+      this.notify(c.code);
+      return;
+    }
+    if (m.t === 'status') {
+      const r = m.room;
+      c.room = r && isCode(r.code) && ROOM_KINDS.includes(r.kind as RoomKind) ? { code: r.code, kind: r.kind } : null;
+      if (m.name !== undefined) c.name = name(m.name);
+      if (m.invisible !== undefined) c.invisible = !!m.invisible;
+      ws.serializeAttachment(c);
+      this.notify(c.code);
+      return;
+    }
+    if (m.t === 'invite') {
+      const list = this.conns();
+      const i = list.findIndex((x) => x.ws === ws);
+      const out = invite(list.map((x) => x.c), i, m.to, Date.now());
+      ws.serializeAttachment(list[i].c);
+      this.dispatch(list, out);
+    }
+  }
+
+  private closed(ws: WebSocket) {
+    const c = ws.deserializeAttachment() as Conn | null;
+    ws.serializeAttachment(null);
+    if (c) this.notify(c.code);
+  }
+
+  async webSocketClose(ws: WebSocket) { this.closed(ws); }
+  async webSocketError(ws: WebSocket) { this.closed(ws); }
 }

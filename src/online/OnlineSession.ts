@@ -245,6 +245,7 @@ export class OnlineSession implements GameHost {
         else { await navigator.clipboard.writeText(`${text} ${link}`); this.toast('Bağlantı kopyalandı.'); }
       } catch { /* vazgeçti */ }
     }));
+    head.appendChild(btn('👥 Arkadaşını çağır', 'small', () => this.game.openFriends()));
     p.appendChild(head);
     if (r.lastResult) {
       const res = r.lastResult;

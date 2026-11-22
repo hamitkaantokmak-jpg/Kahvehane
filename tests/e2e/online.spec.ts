@@ -278,3 +278,49 @@ test('Yancı modu (okey): yancı sahibinin ıstakasını görür ve taş göster
   await C.waitForFunction(() => (window as unknown as W).__game.session.lastError.includes('yakalandın'), null, { timeout: 15_000 });
   for (const e of errs) expect(e.filter((x) => !x.includes('WebSocket'))).toEqual([]);
 });
+
+test('Arkadaşlar: kod, karşılıklı ekleme, kim çevrimiçi, odasına katıl ve masaya çağır; kod kalıcı', async ({ browser }) => {
+  test.setTimeout(240_000);
+  const A = await newPage(browser);
+  const B = await newPage(browser);
+  const errs = [trackErrors(A), trackErrors(B)];
+  await bootAt(A); await bootAt(B);
+  const open = (p: Page) => p.evaluate(() => (window as unknown as W).__game.openFriends());
+  const codeOf = async (p: Page) => { await expect(p.locator('.fr-mycode')).toHaveText(/^[A-Z]{6}$/, { timeout: 20_000 }); return (await p.locator('.fr-mycode').textContent())!.trim(); };
+  await open(A); await open(B);
+  const ca = await codeOf(A), cb = await codeOf(B);
+  expect(ca).not.toBe(cb);
+  // Ali ekler: Veli henüz eklemediği için "bekliyor"
+  await A.locator('.fr-code-in').fill(cb);
+  await A.locator('.fr-name-in').fill('Veli');
+  await A.locator('.fr-add button').click();
+  await expect(A.locator(`.fr-row[data-code="${cb}"]`)).toHaveClass(/pending/, { timeout: 10_000 });
+  // Veli de ekler → ikisi de çevrimiçi görür
+  await B.locator('.fr-code-in').fill(ca);
+  await B.locator('.fr-add button').click();
+  await expect(A.locator(`.fr-row[data-code="${cb}"]`)).toHaveClass(/online/, { timeout: 10_000 });
+  await expect(B.locator(`.fr-row[data-code="${ca}"]`)).toHaveClass(/online/, { timeout: 10_000 });
+  // Ali okey masasında oda kurar → Veli'nin listesinde "okey masasında" + Katıl
+  await A.locator('.friends-panel button[data-act="close"]').click();
+  await A.evaluate(() => { const g = (window as unknown as W).__game; g.sitDown(g.kahve.tableById('okey2').seats[0]); });
+  await A.locator('.online-entry button:has-text("Oda kur")').click({ force: true });
+  await A.locator('.online-panel .cr-name input').fill('Ali');
+  await A.locator('.online-panel button:has-text("Oda kur ▶")').click({ force: true });
+  await expect(A.locator('.room-code').first()).toHaveText(/^[A-Z]{4}$/);
+  await expect(B.locator(`.fr-row[data-code="${ca}"]`)).toContainText('okey masasında', { timeout: 15_000 });
+  // Ali, Veli'yi masaya çağırır → Veli'de çağrı penceresi → Katıl
+  await A.locator('.online-panel button:has-text("Arkadaşını çağır")').click({ force: true });
+  await A.locator(`.fr-row[data-code="${cb}"] button[data-act="invite"]`).click({ force: true });
+  await expect(B.locator('.friend-invite')).toBeVisible({ timeout: 15_000 });
+  await B.locator('.friend-invite button:has-text("Katıl")').click();
+  await expect(B.locator('.friends-panel')).toHaveCount(0);
+  await B.locator('.online-panel .cr-name input').fill('Veli');
+  await B.locator('.online-panel button:has-text("Katıl ▶")').click({ force: true });
+  await expect(A.locator('.online-seats')).toContainText('Veli', { timeout: 15_000 });
+  // kod kalıcı: sayfa yenilenince aynı kod
+  await B.reload();
+  await B.waitForFunction(() => !!(window as unknown as W).__game && (window as unknown as W).__game.frame > 3);
+  await open(B);
+  expect(await codeOf(B)).toBe(cb);
+  for (const e of errs) expect(e.filter((x) => !x.includes('WebSocket'))).toEqual([]);
+});

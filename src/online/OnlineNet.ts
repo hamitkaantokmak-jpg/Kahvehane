@@ -329,6 +329,7 @@ export class OnlineNet {
     mk('🪑 Masaya dön', () => this.backToTable(), 'table');
     mk('💦 Arkadaşa çay', () => this.throwTeaAtFriend(), 'tea');
     mk('📺 Maç gecesi', () => this.send({ t: 'race' }), 'race');
+    mk('👥 Arkadaşlar', () => this.game.openFriends(), 'friends');
     mk('✖ Odadan çık', () => { this.close(); this.game.hud.toast('Odadan çıktın.'); }, 'leave');
     c.appendChild(row);
     c.appendChild(h('div', 'nc-hint muted small', 'Üstteki gerginlik çubuğu odadaki herkesle ortak.'));
