@@ -127,9 +127,13 @@ export class Social {
     return true;
   }
 
+  /** Oyuncu bir hareket yaptı (çevrimiçi ortak kahvehanede arkadaşlara iletilir) */
+  onEmote: (id: EmoteId) => void = () => {};
+
   emote(id: EmoteId) {
     const p = this.player;
     if (p.anim.isIncapacitated()) return;
+    this.onEmote(id);
     const near = this.npcs.filter((n) => n.c.pos.distanceTo(p.pos) < 5);
     switch (id) {
       case 'wave':

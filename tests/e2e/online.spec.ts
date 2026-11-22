@@ -179,3 +179,60 @@ test('Çevrimiçi tavla: iki kişilik oda; Veli tahtayı kendi tarafından gör�
   expect(pb).toEqual(pa.map((_, i) => -pa[23 - i] || 0));
   for (const e of errs) expect(e.filter((x) => !x.includes('WebSocket'))).toEqual([]);
 });
+
+test('Ortak kahvehane: masadan kalkıp dolaşma, el sallama, çay ve kavga, maç gecesi, masaya dönüş', async ({ browser }) => {
+  test.setTimeout(240_000);
+  const A = await newPage(browser);
+  const B = await newPage(browser);
+  const errs = [trackErrors(A), trackErrors(B)];
+  await setupRoom(A, B, 'kart2');
+  // herkes odanın masasında (kart2) oturur
+  expect(await B.evaluate(() => (window as unknown as W).__game.session.seat.table.id)).toBe('kart2');
+  const g = (p: Page, body: string) => p.evaluate((b) => new Function('g', b)((window as unknown as W).__game), body);
+  // Ali masadan kalkar, odada kalır
+  await A.locator('.online-panel button:has-text("Kalk, dolaş")').click({ force: true });
+  await expect(A.locator('.net-chip')).toContainText('2 kişi');
+  expect(await g(A, 'return g.mode')).toBe('explore');
+  // Veli'nin ekranında Ali'nin koltuğu "dolaşıyor", karakteri ayakta ve Ali'nin konumuna yürür
+  await g(A, 'g.player.pos.set(1.5, 0, 3.2);');
+  await B.waitForFunction(() => {
+    const net = (window as unknown as W).__game.net;
+    const a = [...net.avatars.values()][0];
+    return a && !a.seat && Math.hypot(a.c.pos.x - 1.5, a.c.pos.z - 3.2) < 0.3;
+  }, null, { timeout: 20_000 });
+  // el sallama Veli'ye ulaşır (balon)
+  await g(A, "g.social.emote('wave');");
+  await expect(B.locator('.bubble').filter({ hasText: /Selam|Hayırlı|Merhaba/ })).toBeVisible({ timeout: 10_000 });
+  // Ali, Veli'ye çay atar → Veli çaylanır
+  await A.locator('.net-chip button[data-net="tea"]').click();
+  await B.waitForFunction(() => (window as unknown as W).__game.player.stain.remaining > 0, null, { timeout: 20_000 });
+  // Veli de kalkar ve karşılık verir → iki ekranda da kavga uyarısı
+  await B.locator('.online-panel button:has-text("Kalk, dolaş")').click({ force: true });
+  await g(B, 'g.player.pos.set(2.5, 0, 3.2); g.player.yaw = -Math.PI / 2;');
+  await B.waitForTimeout(1500);
+  expect(await g(B, 'return g.net.throwTeaAtFriend()')).toBe(true);
+  await expect(A.locator('.warn')).toContainText('ÇAY KAVGASI', { timeout: 15_000 });
+  await A.waitForFunction(() => (window as unknown as W).__game.player.stain.remaining > 0, null, { timeout: 20_000 });
+  // ortak gerginlik iki tarafta da aynı ve sıfırdan büyük
+  const tA = await g(A, 'return g.net.tension') as number;
+  expect(tA).toBeGreaterThan(0);
+  expect(await g(B, 'return g.net.tension')).toBe(tA);
+  // maç gecesi: iki ekranda aynı yarış (aynı tohum), bahis açık
+  await A.locator('.net-chip button[data-net="race"]').click();
+  // (yerel yarış sürüyorsa maç gecesi o bitince başlar)
+  const seedOf = (p: Page) => g(p, "return g.race.phase === 'betting' ? g.race.schedule.seed : null") as Promise<number | null>;
+  const until = Date.now() + 60_000;
+  let same = false;
+  while (Date.now() < until && !same) { const a = await seedOf(A), b = await seedOf(B); same = a !== null && a === b; if (!same) await A.waitForTimeout(500); }
+  expect(same).toBe(true);
+  // Ali masaya döner: lobi yeniden görünür, kendi koltuğunda oturur
+  await A.locator('.net-chip button[data-net="table"]').click();
+  await expect(A.locator('.online-seats')).toBeVisible();
+  expect(await g(A, 'return g.mode')).toBe('seated');
+  expect(await g(A, 'return g.session.seat.table.id')).toBe('kart2');
+  await expect(A.locator('.net-chip')).toHaveCount(0);
+  // odadan çıkış: Veli'nin ekranında Ali'nin karakteri kaybolur
+  await A.locator('.online-panel button:has-text("Odadan çık")').click({ force: true });
+  await B.waitForFunction(() => (window as unknown as W).__game.net.avatars.size === 0, null, { timeout: 15_000 });
+  for (const e of errs) expect(e.filter((x) => !x.includes('WebSocket'))).toEqual([]);
+});

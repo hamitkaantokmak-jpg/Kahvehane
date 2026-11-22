@@ -13,6 +13,8 @@ import { CharacterCreator } from '../ui/CharacterCreator';
 import { OnlineSession } from '../online/OnlineSession';
 import { isCode } from '../online/protocol';
 import { roomInfo } from '../online/OnlineClient';
+import type { OnlineNet } from '../online/OnlineNet';
+import type { OnlineStart } from '../online/OnlineSession';
 import { NPC_SPECS, PERSONALITIES } from '../npc/roster';
 import { ARCHETYPES } from '../npc/archetypes';
 import { NPC, NpcWorld } from '../npc/NPC';
@@ -89,6 +91,8 @@ export class Game {
   /** ölçüm: atlanan animasyon güncellemesi sayısı */
   animSkipped = 0;
   fader!: OcclusionFader;
+  /** Çevrimiçi oda bağlantısı (ortak kahvehane); masadan kalkınca da sürer */
+  net: OnlineNet | null = null;
   private focus: Interactable | null = null;
   private stepT = 0;
   private fpsFrames = 0;
@@ -168,6 +172,7 @@ export class Game {
     this.fader = new OcclusionFader([...occluders, ...this.npcs.map((n) => n.c.model.root)]);
     this.social = new Social(this.player, this.npcs, this.effects, this.rig, this.world, (m) => this.hud.toast(m));
     this.hud.onEmote = (id) => this.social.emote(id);
+    this.social.onEmote = (id) => this.net?.send({ t: 'emote', id });
     // ekonomi (Aşama 2)
     this.economy = new EconomyController(new LocalEconomyStore(), this.npcs.map((n) => n.id));
     this.social.economy = this.economy;
@@ -351,6 +356,7 @@ export class Game {
       }
       this.kahve.update(dt);
       this.updateChaos(dt);
+      this.net?.update(dt);
       this.updateEconomy(dt);
       this.updateTea(dt);
       this.race.update(dt);
@@ -464,7 +470,7 @@ export class Game {
       case 'interact': this.interact(); break;
       case 'bonk': if (this.social.bonk()) { this.stats.bonks++; saveStats(this.stats); } break;
       case 'tea': this.social.orderTea(); break;
-      case 'throwTea': this.social.throwTea(); break;
+      case 'throwTea': if (this.net?.friendInFront()) this.net.throwTeaAtFriend(); else this.social.throwTea(); break;
       case 'emoteMenu': this.hud.toggleEmotes(); break;
       default:
         if (a.startsWith('emote')) {
@@ -619,7 +625,7 @@ export class Game {
   }
 
   // ------------------------------------------------------------ masa oturumu
-  sitDown(seat: Seat, online?: { create: true } | { code: string }) {
+  sitDown(seat: Seat, online?: OnlineStart) {
     if (seat.occupant) return;
     const p = this.player;
     p.velocity.set(0, 0, 0);
@@ -639,7 +645,7 @@ export class Game {
   }
 
   /** Masadaki seçim ekranından çevrimiçi odaya geç (oyuncu oturmaya devam eder) */
-  startOnline(seat: Seat, start: { create: true } | { code: string }) {
+  startOnline(seat: Seat, start: OnlineStart) {
     if (this.session && 'root' in this.session) this.session.root.remove();
     this.session = new OnlineSession(this, seat, start);
   }
@@ -655,7 +661,8 @@ export class Game {
     if (from && this.session instanceof TableSession) this.session.exit();
     const want = info.kind === 'tavla' ? 2 : 4;
     const tables = this.kahve.tables.filter((x) => x.kind === info.kind);
-    const t = tables.find((x) => x.seats.length === want && x.seats.some((s) => !s.occupant)) ?? tables.find((x) => x.seats.length === want) ?? tables[0];
+    const roomTable = info.table ? this.kahve.tableById(info.table) : undefined;
+    const t = roomTable ?? tables.find((x) => x.seats.length === want && x.seats.some((s) => !s.occupant)) ?? tables.find((x) => x.seats.length === want) ?? tables[0];
     if (!t) return false;
     const seat = t.seats.find((s) => !s.occupant) ?? t.seats[0];
     if (seat.occupant) { const n = this.npcs.find((x) => x.c.seat === seat); n?.leaveSeat(); seat.occupant = null; }
@@ -667,7 +674,7 @@ export class Game {
   private offerInvite() {
     let code: string | null = null;
     try { code = new URLSearchParams(location.search).get('oda')?.toUpperCase() ?? null; } catch { /* yok */ }
-    if (!code || !isCode(code)) return;
+    if (!code || !isCode(code) || this.net?.code === code) return;
     const d = document.createElement('div');
     d.className = 'modal invite-modal';
     d.innerHTML = `<div class="panel"><h3>🌐 Masaya davet edildin</h3><p>Oda kodu: <b class="room-code">${code}</b></p><p class="muted">Arkadaşlarının masasına oturup odaya katılırsın.</p><div class="row-btns"></div></div>`;
