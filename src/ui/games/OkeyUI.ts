@@ -165,7 +165,7 @@ export class OkeyUI implements GameUI {
     this.rack.sync(s.hands[0], s.ctx);
     const live = s.phase !== 'ended';
     this.table.render({
-      seats: s.hands.map((hand, i) => ({ name: i === 0 ? 'Sen' : names[i], count: hand.length, meta: `<b>${s.scores[i]}</b> puan`, turn: live && s.current === i })),
+      seats: s.hands.map((hand, i) => ({ name: names[i] ?? 'Sen', count: hand.length, meta: `<b>${s.scores[i]}</b> puan`, turn: live && s.current === i })),
       discards: s.discards,
       ctx: s.ctx,
       indicator: s.indicator,

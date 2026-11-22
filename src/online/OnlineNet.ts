@@ -18,6 +18,16 @@ import { OnlineClient, Identity } from './OnlineClient';
 import type { RoomView, ServerMsg, ClientMsg } from './protocol';
 import { SEATS_OF } from './protocol';
 import type { Presence, SalonEmote } from './salon';
+import { peekTargetOf } from './yanci';
+
+/** Yancının durduğu yer: sahibinin sandalyesiyle sağındaki oyuncunun arası, biraz geride; masaya bakar */
+export function yanciSpot(owner: Seat, neighbor: Seat): { pos: THREE.Vector3; yaw: number } {
+  const side = neighbor.pos.clone().sub(owner.pos).setY(0).normalize();
+  const c = owner.table.center;
+  const back = owner.pos.clone().sub(c).setY(0).normalize();
+  const pos = owner.pos.clone().addScaledVector(side, 0.5).addScaledVector(back, 0.35).setY(0);
+  return { pos, yaw: Math.atan2(c.x - pos.x, c.z - pos.z) };
+}
 
 /** Masadaki oyun ekranı (OnlineSession) bu arayüzle bağlanır */
 export interface NetSessionHook {
@@ -42,6 +52,9 @@ interface Avatar {
   target: Presence | null;
   /** masada oturduğu koltuk (dolaşmıyorsa) */
   seat: Seat | null;
+  /** yancıysa durduğu yer ve gizlice bakıyor mu */
+  yanci: { pos: THREE.Vector3; yaw: number; toward: THREE.Vector3 } | null;
+  leaning: boolean;
 }
 
 export class OnlineNet {
@@ -66,6 +79,21 @@ export class OnlineNet {
   }
 
   get you() { return this.client.you; }
+
+  /** Benim yancısı olduğum koltuk (yoksa null) */
+  get myYanci(): number | null {
+    return this.room?.watchers?.find((w) => w.player === this.you)?.yanci ?? null;
+  }
+
+  /** Bir koltuğun yancısı (koltuksuz oyuncu) */
+  yanciOfSeat(seat: number) { return this.room?.watchers?.find((w) => w.yanci === seat && w.connected) ?? null; }
+
+  /** Yancı yeri (fiziksel): sahibinin koltuğu ile sağındakinin arası */
+  yanciPlace(owner: number) {
+    const n = this.seatCount;
+    const a = this.physSeat(owner, n), b = this.physSeat(peekTargetOf(owner, n), n);
+    return a && b ? { ...yanciSpot(a, b), toward: b.pos.clone() } : null;
+  }
   send(m: ClientMsg) { this.client.send(m); }
 
   // ------------------------------------------------------------------ masa ekranı bağla/ayır
@@ -114,9 +142,10 @@ export class OnlineNet {
       case 'event': this.onEvent(m.id); break;
       case 'race': this.game.race.syncRace(m.seed, m.in); this.game.hud.toast('📺 MAÇ GECESİ! Herkes TV başına: aynı yarışı birlikte izliyorsunuz.', 4); break;
       case 'error': if (!this.session) this.game.hud.toast(m.msg); break;
+      case 'lean': { const a = this.avatars.get(m.p); if (a) a.leaning = m.on; break; }
     }
     if (m.t === 'room' && this.room?.phase === 'lobby') this.lastState = null;
-    if (this.session && ['welcome', 'room', 'state', 'chaos', 'error'].includes(m.t)) this.session.onMsg(m);
+    if (this.session && ['welcome', 'room', 'state', 'chaos', 'error', 'lean', 'peekView', 'peekCue', 'slap', 'point'].includes(m.t)) this.session.onMsg(m);
   }
 
   // ------------------------------------------------------------------ masa ve koltuklar
@@ -159,7 +188,7 @@ export class OnlineNet {
         const c = new Character({ ...sanitizeSpec(s.spec), id: `online-${s.player}`, name: s.name });
         c.bubbleHost = this.game.bubbles;
         this.game.scene.add(c.model.root);
-        a = { c, pid: s.player, target: null, seat: null };
+        a = { c, pid: s.player, target: null, seat: null, yanci: null, leaning: false };
         this.avatars.set(s.player, a);
         // dolaşan biri ilk kez görünürken kapıda belirir
         c.pos.set(0, 0, 4.6);
@@ -170,6 +199,23 @@ export class OnlineNet {
         if (seat && a.seat !== seat) this.seatAvatar(a, seat);
       }
     });
+    // koltuksuzlar: yancıysa sahibinin yanında ayakta, değilse salonda
+    for (const w of r.watchers ?? []) {
+      if (w.player === this.you || !w.connected) continue;
+      keep.add(w.player);
+      let a = this.avatars.get(w.player);
+      if (!a) {
+        const c = new Character({ ...sanitizeSpec(w.spec), id: `online-${w.player}`, name: w.name });
+        c.bubbleHost = this.game.bubbles;
+        this.game.scene.add(c.model.root);
+        a = { c, pid: w.player, target: null, seat: null, yanci: null, leaning: false };
+        this.avatars.set(w.player, a);
+        c.pos.set(0, 0, 4.6);
+      }
+      this.unseat(a);
+      a.yanci = !w.roam && w.yanci !== null ? this.yanciPlace(w.yanci) : null;
+      if (a.yanci) { a.c.pos.copy(a.yanci.pos); a.c.yaw = a.yanci.yaw; }
+    }
     for (const [pid, a] of this.avatars) if (!keep.has(pid)) { this.removeAvatar(a); this.avatars.delete(pid); }
   }
 
@@ -283,6 +329,7 @@ export class OnlineNet {
     mk('🪑 Masaya dön', () => this.backToTable(), 'table');
     mk('💦 Arkadaşa çay', () => this.throwTeaAtFriend(), 'tea');
     mk('📺 Maç gecesi', () => this.send({ t: 'race' }), 'race');
+    mk('👥 Arkadaşlar', () => this.game.openFriends(), 'friends');
     mk('✖ Odadan çık', () => { this.close(); this.game.hud.toast('Odadan çıktın.'); }, 'leave');
     c.appendChild(row);
     c.appendChild(h('div', 'nc-hint muted small', 'Üstteki gerginlik çubuğu odadaki herkesle ortak.'));
@@ -347,7 +394,14 @@ export class OnlineNet {
     for (const a of this.avatars.values()) {
       const t = a.target, c = a.c;
       c.velocity.set(0, 0, 0);
-      if (t?.roam && !a.seat) {
+      if (a.yanci) {
+        // yancı: sahibinin yanında durur; gizlice bakarken sağdakine doğru eğilir
+        const y = a.yanci;
+        const goal = a.leaning ? y.pos.clone().lerp(y.toward, 0.22) : y.pos;
+        c.pos.lerp(goal, Math.min(1, dt * 6));
+        c.targetYaw = a.leaning ? Math.atan2(y.toward.x - c.pos.x, y.toward.z - c.pos.z) : y.yaw;
+        if (a.leaning && !c.anim.isIncapacitated() && Math.random() < dt * 0.8) c.anim.play('think');
+      } else if (t?.roam && !a.seat) {
         const dx = t.x - c.pos.x, dz = t.z - c.pos.z;
         const d = Math.hypot(dx, dz);
         if (d > 0.04) {

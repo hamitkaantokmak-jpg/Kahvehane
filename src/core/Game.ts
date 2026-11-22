@@ -14,6 +14,8 @@ import { OnlineSession } from '../online/OnlineSession';
 import { isCode } from '../online/protocol';
 import { roomInfo } from '../online/OnlineClient';
 import type { OnlineNet } from '../online/OnlineNet';
+import { FriendsClient } from '../online/FriendsClient';
+import { FriendsPanel } from '../ui/FriendsPanel';
 import type { OnlineStart } from '../online/OnlineSession';
 import { NPC_SPECS, PERSONALITIES } from '../npc/roster';
 import { ARCHETYPES } from '../npc/archetypes';
@@ -93,6 +95,9 @@ export class Game {
   fader!: OcclusionFader;
   /** Çevrimiçi oda bağlantısı (ortak kahvehane); masadan kalkınca da sürer */
   net: OnlineNet | null = null;
+  /** Arkadaş listesi (kim çevrimiçi, masaya çağır) */
+  readonly friends = new FriendsClient(() => (this.player.spec.name && this.player.spec.name !== 'Sen' ? this.player.spec.name : 'Misafir'));
+  friendsPanel: FriendsPanel | null = null;
   private focus: Interactable | null = null;
   private stepT = 0;
   private fpsFrames = 0;
@@ -202,6 +207,9 @@ export class Game {
     });
     this.hud.onResume = () => this.togglePause(false);
     this.hud.onCreator = () => { this.togglePause(false); this.openCreator(); };
+    this.hud.onFriends = () => { this.togglePause(false); this.openFriends(); };
+    this.friends.onError = (m) => this.hud.toast(m);
+    this.friends.onInvite = (from, room) => this.showFriendInvite(from.name, room.code, room.kind);
 
     this.applySettings(this.settings);
     window.addEventListener('resize', () => this.resize());
@@ -259,6 +267,47 @@ export class Game {
   start() {
     this.renderer.setAnimationLoop(() => this.tick());
     setTimeout(() => this.offerInvite(), 1200);
+    this.friends.autoStart();
+  }
+
+  // ------------------------------------------------------------ arkadaşlar
+  openFriends() {
+    if (this.friendsPanel) return;
+    this.input.releasePointer();
+    const wasEnabled = this.input.enabled;
+    this.input.enabled = false;
+    this.friendsPanel = new FriendsPanel(this.overlay, this.friends, {
+      join: (code) => void this.joinFromAnywhere(code),
+      toast: (m) => this.hud.toast(m),
+      close: () => { this.friendsPanel = null; this.input.enabled = wasEnabled && this.mode === 'explore'; },
+    });
+  }
+
+  /** Arkadaşın çağrısı */
+  private showFriendInvite(name: string, code: string, kind: string) {
+    if (this.net?.code === code) return;
+    sfx.play('pop');
+    const d = document.createElement('div');
+    d.className = 'modal invite-modal friend-invite';
+    const where = kind === 'okey' ? 'okey' : kind === 'tavla' ? 'tavla' : 'kart';
+    d.innerHTML = `<div class="panel"><h3>📣 ${name.replace(/[<>&"']/g, '')} seni ${where} masasına çağırıyor!</h3><p>Oda kodu: <b class="room-code">${code}</b></p><div class="row-btns"></div></div>`;
+    const row = d.querySelector('.row-btns')!;
+    const no = document.createElement('button'); no.className = 'ghost'; no.textContent = 'Sonra'; no.onclick = () => d.remove();
+    const yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = 'Katıl ▶'; yes.onclick = () => { d.remove(); void this.joinFromAnywhere(code); };
+    row.append(no, yes);
+    this.overlay.appendChild(d);
+  }
+
+  /** Nerede olursa olsun (masada, dartta, başka odada) odaya geç */
+  async joinFromAnywhere(code: string) {
+    if (this.creator) this.closeCreator();
+    this.friendsPanel?.close();
+    const s = this.session;
+    if (s instanceof OnlineSession) s.exit();
+    else if (s instanceof TableSession) s.exit();
+    else if (s instanceof DartSession) s.exit();
+    if (this.mode !== 'explore') return;
+    await this.joinRoom(code);
   }
 
   // ------------------------------------------------------------ karakter oluşturucu
@@ -357,6 +406,7 @@ export class Game {
       this.kahve.update(dt);
       this.updateChaos(dt);
       this.net?.update(dt);
+      this.friends.setRoom(this.net?.room ? { code: this.net.code, kind: this.net.room.kind } : null);
       this.updateEconomy(dt);
       this.updateTea(dt);
       this.race.update(dt);

@@ -103,6 +103,24 @@ panelinden **Masaya dön**, **Arkadaşa çay**, **Maç gecesi**, **Odadan çık*
   parasıyla; oyuncular arasında para geçmez.
 - Konum mesajları sunucuda depolamaya yazılmaz (yalnızca iletilir); `src/online/salon.ts` saf kurallar, `OnlineNet.ts` istemci.
 
+### Yancı modu (okey masası)
+Okey/101 odasında her koltuğun (müdavim koltuğu dahil) bir **yancısı** olabilir: lobide koltuğun altındaki **🧍 Yancı ol**.
+Koltuklar doluysa okey odasına koltuksuz katılınıp yancı olunur.
+- Yancı, sahibinin ıstakasını ve masayı **sahibinin gözünden** görür; ıstakada bir taşa dokunursa o taş **yalnızca sahibinin**
+  ekranında parlar (👆 işaret). Yancı oynayamaz.
+- **👀 Gizlice bak (basılı tut):** yancı sahibinin sağındaki oyuncunun eline bakar; taşlar yavaş yavaş görünür (uzun bakan çok
+  görür). Bakarken karakteri o tarafa eğilir; bakılan oyuncunun ekranında 1 sn sonra **"ELİNE BAKIYOR!"** uyarısı çıkar.
+- **👋 Tokat at:** bakılan oyuncu bakış sırasında (ya da hemen ardından) tokat atarsa yancı yakalanır ve o el bir daha bakamaz.
+  Boşa atılan tokat herkese görünür ve tokat atan 15 sn bekler. Bakılan müdavimse kendisi fark edip tokatı basar.
+- Kurallar `src/online/yanci.ts` (saf), sunucu tarafı `room.ts`.
+
+### Arkadaşlar
+Mola menüsü (Esc / ☰), salon paneli ya da oda lobisinden **👥 Arkadaşlar**.
+- Hesap yok: herkese 6 harflik bir **arkadaş kodu** verilir (tarayıcıda saklanır; gizli anahtarla korunur, başkası sahiplenemez).
+- Arkadaşının kodunu ekle; **karşılıklı** ekleyince birbirinizin çevrimiçi olup olmadığını ve hangi masada olduğunu görürsünüz.
+- **Katıl ▶** ile arkadaşının odasına geç; odadayken **📣 Masaya çağır** ile arkadaşına çağrı gönder (onda "Katıl" penceresi açılır).
+- **Görünmez ol** seçeneği. Sunucuya yalnızca kod ve takma ad gider. Kurallar `src/online/friends.ts`, sunucu `PresenceDO`.
+
 **Mimari:** kurallar sunucuda çalışır (istemci yalnızca niyet yollar), herkes yalnızca kendi elini görür.
 - `src/online/protocol.ts` mesajlar · `games.ts` oyun bağdaştırıcıları (doğrulama, bot, gizli bilgisi çıkarılmış görünüm) ·
   `room.ts` saf oda mantığı (zaman ve rastgelelik dışarıdan, JSON durum) · `rotate.ts` "ben = 0" görünümü ·

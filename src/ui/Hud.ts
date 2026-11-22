@@ -22,6 +22,7 @@ export class Hud {
   onSettings: (s: Settings) => void = () => {};
   onResume: () => void = () => {};
   onCreator: () => void = () => {};
+  onFriends: () => void = () => {};
   paused = false;
 
   constructor(parent: HTMLElement, private input: Input, private settings: Settings) {
@@ -156,6 +157,7 @@ export class Hud {
       <div class="panel">
         <h2>☕ Mola</h2>
         <button class="accent" id="openCreator">👤 Karakterini düzenle</button>
+        <button class="accent" id="openFriends">👥 Arkadaşlar</button>
         <label>Ana ses <input type="range" min="0" max="1" step="0.05" data-k="master" value="${s.master}"></label>
         <label>Efektler <input type="range" min="0" max="1" step="0.05" data-k="sfx" value="${s.sfx}"></label>
         <label>Ortam uğultusu <input type="range" min="0" max="1" step="0.05" data-k="ambience" value="${s.ambience}"></label>
@@ -196,5 +198,6 @@ export class Hud {
     });
     this.pauseEl.querySelector('#resume')!.addEventListener('click', () => this.onResume());
     this.pauseEl.querySelector('#openCreator')!.addEventListener('click', () => this.onCreator());
+    this.pauseEl.querySelector('#openFriends')!.addEventListener('click', () => this.onFriends());
   }
 }
