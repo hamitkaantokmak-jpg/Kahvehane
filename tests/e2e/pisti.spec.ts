@@ -6,7 +6,7 @@ async function playUntilHandEnd(page: Page) {
   while (Date.now() < until) {
     if (await page.locator('.modal').count()) return;
     const c = page.locator('.phand .card.playable');
-    if (await c.count()) await c.first().click();
+    if (await c.count()) await c.first().click({ force: true, timeout: 5000 }).catch(() => {});
     await page.waitForTimeout(100);
   }
 }
@@ -31,7 +31,7 @@ for (const players of [2, 4] as const) {
       s.pile = [d1]; s.hiddenCount = 0;
       ui.refresh(); return d2.id;`);
     await page.locator(`.phand .card[data-id="${mine}"]`).click();
-    await expect(page.locator('.splash')).toContainText('PİŞTİ');
+    await expect(page.locator('.splash').first()).toContainText('PİŞTİ');
     expect(await withUI(page, 'return s.pistis[0]')).toBe(10);
     await playUntilHandEnd(page);
     const modal = page.locator('.modal');

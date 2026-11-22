@@ -4,7 +4,7 @@
  * Durum her değişiklikte kaydedilir: nesne uyusa (hibernation) ya da yeniden başlasa da oda kaybolmaz.
  */
 import { Room, Out } from '../src/online/room';
-import { isCode, makeCode, parseClientMsg } from '../src/online/protocol';
+import { ROOM_KINDS, RoomKind, isCode, makeCode, parseClientMsg } from '../src/online/protocol';
 
 export interface Env {
   ROOMS: DurableObjectNamespace;
@@ -37,10 +37,12 @@ export default {
     // oda kur
     if (url.pathname === '/rooms' && req.method === 'POST') {
       if (!originOk(origin)) return json({ error: 'izin yok' }, 403, origin);
+      const k = url.searchParams.get('kind') as RoomKind | null;
+      const kind: RoomKind = k && ROOM_KINDS.includes(k) ? k : 'kart';
       for (let i = 0; i < 8; i++) {
         const code = makeCode(random);
         const stub = env.ROOMS.get(env.ROOMS.idFromName(code));
-        const r = await stub.fetch(`https://room/init?code=${code}&seed=${randomSeed()}`, { method: 'POST' });
+        const r = await stub.fetch(`https://room/init?code=${code}&seed=${randomSeed()}&kind=${kind}`, { method: 'POST' });
         if (r.status === 201) return json({ code }, 201, origin);
       }
       return json({ error: 'Oda kurulamadı, tekrar dene.' }, 503, origin);
@@ -106,7 +108,7 @@ export class RoomDO implements DurableObject {
     if (url.pathname === '/init') {
       if (this.room) return new Response('var', { status: 409 });
       const code = url.searchParams.get('code')!;
-      this.room = new Room(code, Number(url.searchParams.get('seed')) >>> 0);
+      this.room = new Room(code, Number(url.searchParams.get('seed')) >>> 0, (url.searchParams.get('kind') ?? 'kart') as RoomKind);
       await this.save();
       await this.ctx.storage.setAlarm(Date.now() + EMPTY_TTL);
       return new Response('ok', { status: 201 });
@@ -114,7 +116,7 @@ export class RoomDO implements DurableObject {
     if (url.pathname === '/info') {
       if (!this.room) return Response.json({ exists: false }, { status: 404 });
       const v = this.room.view();
-      return Response.json({ exists: true, phase: v.phase, game: v.game, humans: this.room.humans.length });
+      return Response.json({ exists: true, phase: v.phase, kind: v.kind, game: v.game, humans: this.room.humans.length });
     }
     if (req.headers.get('Upgrade') === 'websocket') {
       if (!this.room) return new Response('oda yok', { status: 404 });

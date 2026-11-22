@@ -10,8 +10,8 @@ import { sanitizeName, sanitizeSpec } from '../characters/creator';
 import type { CharacterSpec } from '../characters/CharacterSpec';
 import { ONLINE_ENGINES } from './games';
 import {
-  ChaosKind, ChaosPref, ClientMsg, DEFAULT_OPTIONS, GameAction, GameEvent, ONLINE_GAMES, OnlineGameId, OnlineOptions, PROTOCOL_VERSION,
-  RoomView, SEATS_OF, ServerMsg, TAUNTS,
+  ChaosKind, ChaosPref, ClientMsg, DEFAULT_OPTIONS, GAMES_OF_KIND, GameAction, GameEvent, OnlineGameId, OnlineOptions, PROTOCOL_VERSION,
+  ROOM_KINDS, RoomKind, RoomView, SEATS_OF, ServerMsg, TAUNTS,
 } from './protocol';
 
 export const MAX_SEATS = 4;
@@ -59,6 +59,8 @@ export interface RoomData {
   players: PlayerRec[];
   host: string | null;
   phase: 'lobby' | 'playing';
+  /** masa türü (eski kayıtlarda yok → kart) */
+  kind?: RoomKind;
   game: OnlineGameId;
   options: OnlineOptions;
   state: unknown;
@@ -79,9 +81,10 @@ const PREFS: ChaosPref[] = ['calm', 'normal', 'chaos'];
 export class Room {
   d: RoomData;
 
-  constructor(code: string, seed: number) {
+  constructor(code: string, seed: number, kind: RoomKind = 'kart') {
+    if (!ROOM_KINDS.includes(kind)) kind = 'kart';
     this.d = {
-      code, rs: seed >>> 0, players: [], host: null, phase: 'lobby', game: 'batak', options: { ...DEFAULT_OPTIONS }, state: null, seq: 0,
+      code, rs: seed >>> 0, players: [], host: null, phase: 'lobby', kind, game: GAMES_OF_KIND[kind][0], options: { ...DEFAULT_OPTIONS }, state: null, seq: 0,
       lastEvent: null, nextActAt: 0, pauseUntil: 0, turnSince: 0, handOverAt: null, nextVotes: [], lastResult: null, idCounter: 0,
     };
   }
@@ -99,6 +102,9 @@ export class Room {
   };
 
   private get engine() { return ONLINE_ENGINES[this.d.game]; }
+  get kind(): RoomKind { return this.d.kind ?? 'kart'; }
+  /** Masadaki koltuk sayısı (tavla masası 2 kişilik) */
+  get capacity() { return this.kind === 'tavla' ? 2 : MAX_SEATS; }
   private get seatCount() { return SEATS_OF[this.d.game]; }
   player(id: string) { return this.d.players.find((p) => p.id === id) ?? null; }
   private bySeat(seat: number) { return this.d.players.find((p) => p.seat === seat) ?? null; }
@@ -117,7 +123,7 @@ export class Room {
       p.spec = { ...sanitizeSpec(m.spec), name: p.name };
       if (PREFS.includes(m.chaos)) p.chaos = m.chaos;
     } else {
-      if (this.humans.length >= MAX_SEATS) return { player: null, out: [] };
+      if (this.humans.length >= this.capacity) return { player: null, out: [] };
       const seat = this.freeSeatFor();
       if (seat === null) return { player: null, out: [] };
       const id = `p${++this.d.idCounter}`;
@@ -138,7 +144,7 @@ export class Room {
 
   /** Lobide ilk boş koltuk; oyun sürüyorsa bir botun koltuğu */
   private freeSeatFor(): number | null {
-    const limit = this.d.phase === 'playing' ? this.seatCount : MAX_SEATS;
+    const limit = this.d.phase === 'playing' ? this.seatCount : this.capacity;
     for (let s = 0; s < limit; s++) if (!this.bySeat(s)) return s;
     return null;
   }
@@ -189,7 +195,7 @@ export class Room {
 
   private onSeat(p: PlayerRec, seat: number): Out[] {
     if (this.d.phase !== 'lobby') return [this.err(p.id, 'Oyun sürerken yer değiştirilemez.')];
-    if (!Number.isInteger(seat) || seat < 0 || seat >= MAX_SEATS) return [this.err(p.id, 'Geçersiz koltuk.')];
+    if (!Number.isInteger(seat) || seat < 0 || seat >= this.capacity) return [this.err(p.id, 'Geçersiz koltuk.')];
     if (this.bySeat(seat)) return [this.err(p.id, 'Bu koltuk dolu.')];
     p.seat = seat;
     return this.roomToAll(null);
@@ -198,9 +204,9 @@ export class Room {
   private onConfig(p: PlayerRec, game: OnlineGameId, o: Partial<OnlineOptions>): Out[] {
     if (p.id !== this.d.host) return [this.err(p.id, 'Oyunu oda sahibi seçer.')];
     if (this.d.phase !== 'lobby') return [this.err(p.id, 'Oyun sürüyor.')];
-    if (!ONLINE_GAMES.includes(game)) return [this.err(p.id, 'Bu oyun çevrimiçi değil.')];
+    if (!GAMES_OF_KIND[this.kind].includes(game)) return [this.err(p.id, 'Bu oyun bu masada oynanmaz.')];
     this.d.game = game;
-    const cur = this.d.options;
+    const cur = { ...DEFAULT_OPTIONS, ...this.d.options };
     const pick = <T>(v: unknown, allowed: readonly T[], d: T) => (allowed.includes(v as T) ? (v as T) : d);
     this.d.options = {
       batakPartners: typeof o.batakPartners === 'boolean' ? o.batakPartners : cur.batakPartners,
@@ -208,6 +214,10 @@ export class Room {
       batakZeroPenalty: typeof o.batakZeroPenalty === 'boolean' ? o.batakZeroPenalty : cur.batakZeroPenalty,
       kingShort: typeof o.kingShort === 'boolean' ? o.kingShort : cur.kingShort,
       pistiTarget: pick(o.pistiTarget, [51, 101, 151], cur.pistiTarget),
+      okey101Hands: pick(o.okey101Hands, [1, 3, 5, 7], cur.okey101Hands),
+      okey101Doubling: typeof o.okey101Doubling === 'boolean' ? o.okey101Doubling : cur.okey101Doubling,
+      tavlaTarget: pick(o.tavlaTarget, [1, 3, 5, 7], cur.tavlaTarget),
+      tavlaKatmerli: typeof o.tavlaKatmerli === 'boolean' ? o.tavlaKatmerli : cur.tavlaKatmerli,
       difficulty: pick(o.difficulty, ['easy', 'medium', 'hard'] as const, cur.difficulty),
     };
     return this.roomToAll(null);
@@ -221,7 +231,7 @@ export class Room {
     if (humans.length > n) return [this.err(p.id, `Bu oyun ${n} kişilik; masada ${humans.length} kişi var.`)];
     // kullanılmayan koltuklardakileri boş koltuklara al
     for (const h of humans) if (h.seat! >= n) h.seat = [...Array(n).keys()].find((s) => !this.bySeat(s))!;
-    this.d.state = this.engine.create(this.d.options, this.rng);
+    this.d.state = this.engine.create({ ...DEFAULT_OPTIONS, ...this.d.options }, this.rng);
     this.d.phase = 'playing';
     this.d.seq++;
     this.d.lastEvent = null;
@@ -244,7 +254,7 @@ export class Room {
   }
 
   private applyAction(seat: number, a: GameAction, now: number): Out[] {
-    const ev = this.engine.apply(this.d.state, seat, a);
+    const ev = this.engine.apply(this.d.state, seat, a, this.rng);
     this.d.seq++;
     this.d.lastEvent = { seat, action: a, ...ev };
     this.d.turnSince = now;
@@ -326,7 +336,14 @@ export class Room {
       if (!away && !idle) return [];
     }
     const a = this.engine.bot(this.d.state, seat, this.rng, this.d.options.difficulty);
-    return this.applyAction(seat, a, now);
+    try {
+      return this.applyAction(seat, a, now);
+    } catch (e) {
+      // bot yanıldıysa oyun kilitlenmesin: en basit geçerli hamle
+      const safe = this.engine.safe?.(this.d.state, seat);
+      if (!safe) throw e;
+      return this.applyAction(seat, safe, now);
+    }
   }
 
   /** Bir sonraki tick ne zaman gerekli (ms, mutlak); gerekmiyorsa null */
@@ -345,9 +362,9 @@ export class Room {
   private seatName(s: number) { return this.bySeat(s)?.name ?? BOT_SEATS[s].name; }
 
   view(): RoomView {
-    const n = this.d.phase === 'playing' ? this.seatCount : MAX_SEATS;
+    const n = this.d.phase === 'playing' ? this.seatCount : this.capacity;
     return {
-      code: this.d.code, host: this.d.host, phase: this.d.phase, game: this.d.game, options: { ...this.d.options }, lastResult: this.d.lastResult,
+      code: this.d.code, host: this.d.host, phase: this.d.phase, kind: this.kind, game: this.d.game, options: { ...this.d.options }, lastResult: this.d.lastResult,
       seats: [...Array(n).keys()].map((s) => {
         const p = this.bySeat(s);
         return p ? { occ: 'human', name: p.name, player: p.id, spec: p.spec, connected: p.connected, chaos: p.chaos } : { occ: 'bot', name: BOT_SEATS[s].name };

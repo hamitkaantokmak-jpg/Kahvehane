@@ -12,6 +12,7 @@ import { loadPlayerSpec, savePlayerSpec, localSpecStore } from '../characters/cr
 import { CharacterCreator } from '../ui/CharacterCreator';
 import { OnlineSession } from '../online/OnlineSession';
 import { isCode } from '../online/protocol';
+import { roomInfo } from '../online/OnlineClient';
 import { NPC_SPECS, PERSONALITIES } from '../npc/roster';
 import { ARCHETYPES } from '../npc/archetypes';
 import { NPC, NpcWorld } from '../npc/NPC';
@@ -632,23 +633,40 @@ export class Game {
     this.session = new OnlineSession(this, seat, start);
   }
 
-  /** Davet bağlantısı (?oda=KOD): kart masasında boş bir koltuğa oturup odaya katılmayı teklif et */
+  /**
+   * Kodla odaya katıl. Oda bir masa türüne bağlıdır (kart/okey/tavla): oyuncu o türde bir masada değilse
+   * uygun masaya geçirilir. `from`: şu an oturduğu koltuk (masa seçim ekranından katılırken).
+   */
+  async joinRoom(code: string, from?: Seat): Promise<boolean> {
+    const info = await roomInfo(code);
+    if (!info) { this.hud.toast('Böyle bir oda yok ya da kapanmış.'); return false; }
+    if (from && from.table.kind === info.kind) { this.startOnline(from, { code }); return true; }
+    if (from && this.session instanceof TableSession) this.session.exit();
+    const want = info.kind === 'tavla' ? 2 : 4;
+    const tables = this.kahve.tables.filter((x) => x.kind === info.kind);
+    const t = tables.find((x) => x.seats.length === want && x.seats.some((s) => !s.occupant)) ?? tables.find((x) => x.seats.length === want) ?? tables[0];
+    if (!t) return false;
+    const seat = t.seats.find((s) => !s.occupant) ?? t.seats[0];
+    if (seat.occupant) { const n = this.npcs.find((x) => x.c.seat === seat); n?.leaveSeat(); seat.occupant = null; }
+    this.sitDown(seat, { code });
+    return true;
+  }
+
+  /** Davet bağlantısı (?oda=KOD): odanın masasında boş bir koltuğa oturup odaya katılmayı teklif et */
   private offerInvite() {
     let code: string | null = null;
     try { code = new URLSearchParams(location.search).get('oda')?.toUpperCase() ?? null; } catch { /* yok */ }
     if (!code || !isCode(code)) return;
     const d = document.createElement('div');
     d.className = 'modal invite-modal';
-    d.innerHTML = `<div class="panel"><h3>🌐 Masaya davet edildin</h3><p>Oda kodu: <b class="room-code">${code}</b></p><p class="muted">Kart masasına oturup arkadaşlarının odasına katılırsın.</p><div class="row-btns"></div></div>`;
+    d.innerHTML = `<div class="panel"><h3>🌐 Masaya davet edildin</h3><p>Oda kodu: <b class="room-code">${code}</b></p><p class="muted">Arkadaşlarının masasına oturup odaya katılırsın.</p><div class="row-btns"></div></div>`;
     const row = d.querySelector('.row-btns')!;
     const no = document.createElement('button'); no.className = 'ghost'; no.textContent = 'Sonra'; no.onclick = () => d.remove();
     const yes = document.createElement('button'); yes.className = 'primary'; yes.textContent = 'Masaya otur ▶';
     yes.onclick = () => {
       d.remove();
-      const t = this.kahve.tables.find((x) => x.kind === 'kart' && x.seats.length === 4) ?? this.kahve.tables.find((x) => x.kind === 'kart')!;
-      const seat = t.seats.find((s) => !s.occupant) ?? t.seats[0];
-      if (seat.occupant) { const n = this.npcs.find((x) => x.c.seat === seat); n?.leaveSeat(); seat.occupant = null; }
-      this.sitDown(seat, { code: code! });
+      if (this.mode !== 'explore') return;
+      void this.joinRoom(code!);
     };
     row.append(no, yes);
     this.overlay.appendChild(d);

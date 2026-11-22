@@ -13,15 +13,15 @@ const KIND_TR: Record<string, string> = { normal: 'normal bitti', okey: 'okey at
 export class OkeyUI implements GameUI {
   readonly el: HTMLDivElement;
   s: O.OkeyState;
-  private rng = createRng();
+  protected rng = createRng();
   rack = new Rack();
-  private alive = true;
-  private botTimer = 0;
-  private status!: HTMLDivElement;
-  private table!: OkeyTable;
-  private btns!: HTMLDivElement;
+  protected alive = true;
+  protected botTimer = 0;
+  protected status!: HTMLDivElement;
+  protected table!: OkeyTable;
+  protected btns!: HTMLDivElement;
 
-  constructor(private host: GameHost) {
+  constructor(protected host: GameHost) {
     this.el = h('div', 'gui okey');
     this.s = O.newMatch(this.rng, 0);
     this.build();
@@ -31,7 +31,7 @@ export class OkeyUI implements GameUI {
     this.pump();
   }
 
-  private build() {
+  protected build() {
     this.table = new OkeyTable({ onDeck: () => this.drawDeck(), onLeft: () => this.drawLeft() });
     this.status = h('div', 'status');
     this.btns = h('div', 'gbtns');
@@ -58,7 +58,7 @@ export class OkeyUI implements GameUI {
   }
 
   // ------------------------------------------------------------ bot döngüsü
-  private pump() {
+  protected pump() {
     if (!this.alive || this.s.phase === 'ended') return;
     if (this.host.isHuman(this.s.current)) return;
     // masadan kalkan (kavgadaki) oyuncu varsa bot sırası bekler
@@ -69,7 +69,7 @@ export class OkeyUI implements GameUI {
     this.botTimer = later(() => this.botStep(p), 700 + Math.random() * 600);
   }
 
-  private botStep(p: number) {
+  protected botStep(p: number) {
     if (!this.alive || this.s.current !== p || this.s.phase === 'ended') return;
     // ilk tur göstergeyi göster
     if (O.canShowIndicator(this.s, p)) {
@@ -108,9 +108,9 @@ export class OkeyUI implements GameUI {
   }
 
   // ------------------------------------------------------------ insan hamleleri
-  private myTurn() { return this.s.current === 0 && this.s.phase !== 'ended'; }
+  protected myTurn() { return this.s.current === 0 && this.s.phase !== 'ended'; }
 
-  private drawDeck() {
+  protected drawDeck() {
     if (!this.myTurn() || this.s.phase !== 'draw') return;
     const t = O.drawFromDeck(this.s, 0);
     this.host.sfx('tile');
@@ -118,7 +118,7 @@ export class OkeyUI implements GameUI {
     this.after();
   }
 
-  private drawLeft() {
+  protected drawLeft() {
     if (!this.myTurn() || this.s.phase !== 'draw' || !O.canTakeDiscard(this.s, 0)) return;
     const t = O.drawFromDiscard(this.s, 0);
     this.host.sfx('tile');
@@ -126,7 +126,7 @@ export class OkeyUI implements GameUI {
     this.after();
   }
 
-  private discard(id: number) {
+  protected discard(id: number) {
     if (!this.myTurn() || this.s.phase !== 'discard') { this.host.toast(this.s.phase === 'draw' ? 'Önce taş çek (desteden ya da soldan).' : 'Sıra sende değil.'); return; }
     const t = O.discard(this.s, 0, id);
     this.host.sfx('tile');
@@ -136,7 +136,7 @@ export class OkeyUI implements GameUI {
     this.after();
   }
 
-  private finish(id: number) {
+  protected finish(id: number) {
     if (!this.myTurn() || this.s.phase !== 'discard') return;
     if (!O.canFinishWith(this.s, 0, id)) { this.host.toast('Bu taşı atınca el bitmiyor. Perlerini kontrol et.'); return; }
     O.finish(this.s, 0, id);
@@ -145,7 +145,7 @@ export class OkeyUI implements GameUI {
     this.after();
   }
 
-  private after() {
+  protected after() {
     this.rack.sync(this.s.hands[0], this.s.ctx);
     this.render();
     if (this.s.phase === 'ended') { this.onHandEnd(); return; }
@@ -153,12 +153,12 @@ export class OkeyUI implements GameUI {
   }
 
   // ------------------------------------------------------------ çizim
-  private sync3d() {
+  protected sync3d() {
     const s = this.s;
     this.host.table3d.syncOkey({ hands: [s.hands[0]], handCounts: s.hands.map((x) => x.length), rackOrder: this.rack.slots, deckCount: s.deck.length, deckIds: s.deck.map((t) => t.id), indicator: s.indicator, ctx: s.ctx, discards: s.discards });
   }
 
-  private render() {
+  protected render() {
     this.sync3d();
     const s = this.s;
     const names = this.host.names;
@@ -184,7 +184,7 @@ export class OkeyUI implements GameUI {
     this.renderButtons();
   }
 
-  private renderButtons() {
+  protected renderButtons() {
     const s = this.s;
     this.btns.innerHTML = '';
     const sel = [...this.rack.selected][0];
@@ -192,7 +192,7 @@ export class OkeyUI implements GameUI {
     this.btns.appendChild(btn('Çift diz', 'small', () => this.rack.arrangePairs()));
     this.btns.appendChild(btn('Sırala', 'small', () => this.rack.arrangeSorted()));
     if (O.canShowIndicator(s, 0)) {
-      this.btns.appendChild(btn('Gösterge göster', 'small accent', () => { O.showIndicator(s, 0); this.host.sfx('tile'); this.host.toast('Göstergeyi gösterdin: rakipler 1 puan kaybetti.'); this.render(); }));
+      this.btns.appendChild(btn('Gösterge göster', 'small accent', () => this.doIndicator()));
     }
     const canAct = this.myTurn() && s.phase === 'discard' && sel !== undefined;
     const at = btn('At', canAct ? 'primary' : 'primary disabled', () => sel !== undefined && this.discard(sel));
@@ -207,7 +207,17 @@ export class OkeyUI implements GameUI {
     this.btns.appendChild(btn('Kalk', 'ghost small', () => this.host.exit()));
   }
 
-  private onHandEnd() {
+  protected doIndicator() {
+    O.showIndicator(this.s, 0); this.host.sfx('tile'); this.host.toast('Göstergeyi gösterdin: rakipler 1 puan kaybetti.'); this.render();
+    if (this.s.phase === 'ended') this.onHandEnd();
+  }
+
+  protected newMatchLabel = 'Yeni maç';
+  protected resetRack() { this.rack.slots.fill(null); this.rack.sync(this.s.hands[0], this.s.ctx); this.rack.arrangeMelds(O.OKEY_RULES); }
+  protected onNextHand() { O.nextHand(this.s, this.rng); this.resetRack(); this.render(); this.host.sfx('deal'); this.pump(); }
+  protected onNewMatch() { this.s = O.newMatch(this.rng, 0); this.resetRack(); this.render(); this.pump(); }
+
+  protected onHandEnd() {
     const s = this.s;
     const r = s.result!;
     const names = this.host.names;
@@ -223,10 +233,10 @@ export class OkeyUI implements GameUI {
       <table class="score"><tr><th>Oyuncu</th><th>Bu el</th><th>Puan</th></tr>${rows}</table>
       ${over ? `<h3>${mw === 0 ? '🏆 Maçı KAZANDIN!' : `🏆 Maçı ${names[mw]} kazandı`}</h3>` : ''}</div>`;
     const row = h('div', 'row-btns');
-    if (!over) row.appendChild(btn('Sonraki el ▶', 'primary', () => { m.remove(); O.nextHand(s, this.rng); this.rack.slots.fill(null); this.rack.sync(s.hands[0], s.ctx); this.rack.arrangeMelds(O.OKEY_RULES); this.render(); this.host.sfx('deal'); this.pump(); }));
+    if (!over) row.appendChild(btn('Sonraki el ▶', 'primary', () => { m.remove(); this.onNextHand(); }));
     else {
       this.host.matchFinished(mw === 0);
-      row.appendChild(btn('Yeni maç', 'primary', () => { m.remove(); this.s = O.newMatch(this.rng, 0); this.rack.slots.fill(null); this.rack.sync(this.s.hands[0], this.s.ctx); this.rack.arrangeMelds(O.OKEY_RULES); this.render(); this.pump(); }));
+      row.appendChild(btn(this.newMatchLabel, 'primary', () => { m.remove(); this.onNewMatch(); }));
     }
     row.appendChild(btn('Masadan kalk', 'ghost', () => this.host.exit()));
     m.querySelector('.panel')!.appendChild(row);

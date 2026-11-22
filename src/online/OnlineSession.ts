@@ -15,10 +15,10 @@ import { h, btn } from '../ui/dom';
 import { sfx, SfxName } from '../audio/Sfx';
 import { pickLine } from '../npc/personalities';
 import { OnlineClient, createRoom, roomExists } from './OnlineClient';
-import { ChaosKind, ChaosPref, ONLINE_GAMES, OnlineGameId, RoomView, SEATS_OF, ServerMsg, TAUNTS } from './protocol';
+import { ChaosKind, ChaosPref, GAMES_OF_KIND, GameAction, OnlineGameId, RoomKind, RoomView, SEATS_OF, ServerMsg, TAUNTS } from './protocol';
 import { BOT_SEATS } from './room';
-import { rotateEvent, rotateView, toAbs, toRel } from './rotate';
-import { NetUI, OnlineBatakUI, OnlineKingUI, OnlinePistiUI } from './OnlineUIs';
+import { actionToAbs, rotateEvent, rotateView, toAbs, toRel } from './rotate';
+import { NetUI, OnlineBatakUI, OnlineKingUI, OnlineOkey101UI, OnlineOkeyUI, OnlinePistiUI, OnlineTavlaUI } from './OnlineUIs';
 
 const PREF_TR: Record<ChaosPref, string> = { calm: 'Sakin', normal: 'Normal', chaos: 'Tam kaos' };
 const OBJECTION_LINES = ['İtiraz var! Bu el hileli!', 'Hakem! Kart karıştı!', 'Bir dakika, bir dakika!'];
@@ -80,7 +80,7 @@ export class OnlineSession implements GameHost {
       if (!nm) { this.toast('Önce bir takma ad yaz.'); name.focus(); return; }
       go.classList.add('disabled');
       try {
-        const code = 'create' in start ? await createRoom() : start.code;
+        const code = 'create' in start ? await createRoom(this.table.kind as RoomKind) : start.code;
         if (!('create' in start) && !(await roomExists(code))) throw new Error('Böyle bir oda yok ya da kapanmış.');
         this.connect(code, nm);
       } catch (e) {
@@ -156,9 +156,12 @@ export class OnlineSession implements GameHost {
     this.table.props.visible = false;
     this.table3d.clear();
     this.game.player.model.root.visible = false;
-    const net = { act: (a: import('./protocol').GameAction) => this.client?.send({ t: 'act', a }), next: () => this.client?.send({ t: 'next' }), toLobby: () => this.backToLobby() };
+    const net = { act: (a: GameAction) => this.client?.send({ t: 'act', a: actionToAbs(g, a, this.mySeat ?? 0) }), next: () => this.client?.send({ t: 'next' }), toLobby: () => this.backToLobby() };
     if (g === 'batak') this.ui = new OnlineBatakUI(this, { partners: !!o?.batakPartners, hands: o?.batakHands ?? 5, zeroPenalty: !!o?.batakZeroPenalty }, net);
     else if (g === 'king') this.ui = new OnlineKingUI(this, { short: !!o?.kingShort }, net);
+    else if (g === 'okey') this.ui = new OnlineOkeyUI(this, net);
+    else if (g === 'okey101') this.ui = new OnlineOkey101UI(this, o?.okey101Hands ?? 3, !!o?.okey101Doubling, net);
+    else if (g === 'tavla') this.ui = new OnlineTavlaUI(this, { target: o?.tavlaTarget ?? 5, katmerliMars: o?.tavlaKatmerli ?? true }, net);
     else this.ui = new OnlinePistiUI(this, { players: g === 'pisti2' ? 2 : 4, target: o?.pistiTarget ?? 101 }, net);
     this.root.insertBefore(this.ui.el, this.status);
     this.addChaosBar();
@@ -213,7 +216,7 @@ export class OnlineSession implements GameHost {
     if (r.game === 'batak' && r.options.batakPartners) p.appendChild(h('p', 'muted small', 'Eşli batak: karşılıklı koltuklar ortaktır (1-3, 2-4).'));
     // oyun seçimi
     const gameRow = h('div', 'online-games');
-    for (const g of ONLINE_GAMES) {
+    for (const g of GAMES_OF_KIND[r.kind ?? 'kart']) {
       const b = btn(GAME_META[g].name, `small${r.game === g ? ' accent' : ''}${iAmHost ? '' : ' disabled'}`, () => iAmHost && this.client?.send({ t: 'config', game: g, options: {} }));
       b.dataset.game = g;
       gameRow.appendChild(b);
@@ -254,16 +257,18 @@ export class OnlineSession implements GameHost {
     if (r.game === 'batak') d.append(sel('El sayısı', 'batakHands', [3, 5, 7, 11], o.batakHands), chk('Eşli', 'batakPartners', o.batakPartners), chk('El almayan cezalı', 'batakZeroPenalty', o.batakZeroPenalty));
     if (r.game === 'king') d.append(chk('Kısa King (8 el)', 'kingShort', o.kingShort));
     if (r.game.startsWith('pisti')) d.append(sel('Hedef', 'pistiTarget', [51, 101, 151], o.pistiTarget));
+    if (r.game === 'okey101') d.append(sel('El sayısı', 'okey101Hands', [1, 3, 5, 7], o.okey101Hands ?? 3), chk('Katlamalı', 'okey101Doubling', !!o.okey101Doubling));
+    if (r.game === 'tavla') d.append(sel('Maç', 'tavlaTarget', [1, 3, 5, 7], o.tavlaTarget ?? 5, (v) => `${v} puan`), chk('Katmerli mars', 'tavlaKatmerli', o.tavlaKatmerli ?? true));
     d.append(sel('Müdavim seviyesi', 'difficulty', ['easy', 'medium', 'hard'], o.difficulty, (v) => DIFFICULTY_TR[v as Difficulty]));
     return d;
   }
 
   // ------------------------------------------------------------------ masadaki karakterler
-  private n() { return this.uiGame ? SEATS_OF[this.uiGame] : this.room?.phase === 'playing' ? SEATS_OF[this.room.game] : 4; }
+  private n() { return this.uiGame ? SEATS_OF[this.uiGame] : this.room?.phase === 'playing' ? SEATS_OF[this.room.game] : this.room?.seats.length ?? 4; }
 
   /** Göreli koltuk → masadaki fiziksel koltuk */
   private tableSeat(rel: number, n: number): Seat {
-    const off = n === 2 ? rel * 2 : rel;
+    const off = n === 2 && this.table.seats.length === 4 ? rel * 2 : rel;
     return this.table.seats[(this.seat.index + off) % this.table.seats.length];
   }
 

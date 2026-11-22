@@ -119,11 +119,12 @@ export class TableSession implements GameHost {
       list.appendChild(card);
     }
     panel.appendChild(list);
-    // çevrimiçi: arkadaşlarla (kart masası)
-    if (this.table.kind === 'kart') {
+    // çevrimiçi: arkadaşlarla (her masa kendi oyunlarıyla)
+    {
+      const desc = this.table.kind === 'kart' ? 'Batak, King ve Pişti' : this.table.kind === 'okey' ? 'Okey ve 101' : 'Tavla';
       const on = h('div', 'online-entry');
       on.appendChild(h('div', 'gc-title', '🌐 Arkadaşlarla oyna (çevrimiçi)'));
-      on.appendChild(h('div', 'gc-desc', 'Batak, King ve Pişti. Oda kur, kodu gönder; boş koltuklara müdavimler oturur.'));
+      on.appendChild(h('div', 'gc-desc', `${desc}. Oda kur, kodu gönder; boş koltuklara müdavimler oturur.`));
       const row = h('div', 'online-row');
       row.appendChild(btn('Oda kur', 'primary small', () => this.game.startOnline(this.seat, { create: true })));
       const code = document.createElement('input');
@@ -133,7 +134,7 @@ export class TableSession implements GameHost {
       row.appendChild(code);
       row.appendChild(btn('Koda katıl', 'small', () => {
         if (code.value.length !== 4) { this.toast('4 harflik oda kodunu yaz.'); return; }
-        this.game.startOnline(this.seat, { code: code.value });
+        void this.game.joinRoom(code.value, this.seat);
       }));
       on.appendChild(row);
       panel.appendChild(on);

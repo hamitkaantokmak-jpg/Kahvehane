@@ -76,10 +76,14 @@ Klasik Okey ve 101, yukarıdan bakılan yeşil çuha bir masada oynanır (`src/u
   Yatay telefonda ıstaka solda, durum ve düğmeler sağda durur.
 
 ## Çevrimiçi: arkadaşlarla masa (1. aşama)
-Kart masasına otur → **🌐 Arkadaşlarla oyna** → **Oda kur** (ya da 4 harflik kodla **Koda katıl**). Lobide oda kodu ve
+Herhangi bir masaya otur → **🌐 Arkadaşlarla oyna** → **Oda kur** (ya da 4 harflik kodla **Koda katıl**). Lobide oda kodu ve
 **davet bağlantısı** (`…/Kahvehane/?oda=KOD`) paylaşılır; bağlantıyı açan arkadaş masaya oturup odaya katılır.
-- Oyunlar: **İhaleli Batak, King, Pişti (2 ve 4 kişi)**. Oda sahibi oyunu, seçenekleri ve müdavim seviyesini seçip başlatır.
-- En çok 4 kişi; boş koltuklara müdavimler (bot) oturur. Arkadaşların, karakter oluşturucudaki karakterleriyle masada oturur.
+- Oda, kurulduğu masanın türüne bağlıdır; koda katılan ya da davet bağlantısını açan oyuncu kendiliğinden o türde bir masaya geçer.
+  - **Kart masası:** İhaleli Batak, King, Pişti (2 ve 4 kişi)
+  - **Okey masası:** Klasik Okey, 101 (el sayısı, katlamalı)
+  - **Tavla masası:** Tavla, 2 kişilik (maç puanı, katmerli mars). Her iki oyuncu da tahtayı kendi tarafından (beyaz) görür.
+- Oda sahibi oyunu, seçenekleri ve müdavim seviyesini seçip başlatır.
+- En çok 4 kişi (tavla 2); boş koltuklara müdavimler (bot) oturur. Arkadaşların, karakter oluşturucudaki karakterleriyle masada oturur.
 - Bağlantısı kopanın ya da 60 sn oynamayanın yerine müdavim oynar; geri dönen (aynı tarayıcı sekmesi) koltuğuna döner.
 - **Kaos (yalnızca görsel):** 💬 hazır sözlerle laf atma, 🙋 itiraz, 👊 masaya vurma, 💦 çay atma, 🌪️ masayı devirme (maçta bir kez).
   Herkes kendi kaos ayarını seçer: **Sakin** olana çay atılamaz, sakin olan da çay atamaz/masa deviremez. Bekleme süreleri var;
