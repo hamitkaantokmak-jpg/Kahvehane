@@ -21,14 +21,14 @@ const tokenOf = (code: string) => { try { return sessionStorage.getItem(TOKEN_KE
 const saveToken = (code: string, t: string) => { try { sessionStorage.setItem(TOKEN_KEY(code), t); } catch { /* yok */ } };
 
 /** Yeni oda kur → oda kodu */
-export async function createRoom(kind: RoomKind = 'kart'): Promise<string> {
-  const r = await fetch(`${serverUrl()}/rooms?kind=${kind}`, { method: 'POST' });
+export async function createRoom(kind: RoomKind = 'kart', table = ''): Promise<string> {
+  const r = await fetch(`${serverUrl()}/rooms?kind=${kind}&table=${encodeURIComponent(table)}`, { method: 'POST' });
   const j = (await r.json()) as { code?: string; error?: string };
   if (!r.ok || !j.code) throw new Error(j.error ?? 'Oda kurulamadı.');
   return j.code;
 }
 
-export interface RoomInfo { exists: boolean; kind: RoomKind; phase?: string; game?: string; humans?: number }
+export interface RoomInfo { exists: boolean; kind: RoomKind; table?: string; phase?: string; game?: string; humans?: number }
 
 /** Oda bilgisi (yoksa null). Eski sunucu masa türü yollamazsa kart masası sayılır. */
 export async function roomInfo(code: string): Promise<RoomInfo | null> {

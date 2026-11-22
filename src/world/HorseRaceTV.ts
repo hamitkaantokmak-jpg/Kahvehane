@@ -27,10 +27,29 @@ export class HorseRaceTV {
   get phase() { return this.schedule.phase; }
   get playerBet() { return this.bets.find((b) => b.who === PLAYER) ?? null; }
 
+  /**
+   * Maç gecesi (çevrimiçi): odadaki herkes aynı yarışı izler. Tohum sunucudan gelir; bahisler hemen açılır,
+   * yarış `inMs` sonra başlar. Bahisler herkesin kendi oyun içi parasıyla; oyuncular arasında para geçmez.
+   */
+  syncRace(seed: number, inMs: number) {
+    // ekranda yarış sürüyorsa bitince başlat (başlama anı korunur)
+    if (this.schedule.phase === 'running') { this.pendingSync = { seed, at: performance.now() + inMs }; return; }
+    this.pendingSync = null;
+    this.closeModal();
+    this.schedule.phase = 'betting';
+    this.schedule.timer = Math.max(3, inMs / 1000);
+    this.schedule.raceNo++;
+    this.schedule.seed = seed >>> 0;
+    this.openBetting();
+  }
+
   /** Yarışı hemen başlat (test/hata ayıklama) */
   startNow() { this.schedule.phase = 'idle'; this.schedule.timer = 0; }
 
+  private pendingSync: { seed: number; at: number } | null = null;
+
   update(dt: number) {
+    if (this.pendingSync && this.schedule.phase !== 'running') { const p = this.pendingSync; this.syncRace(p.seed, Math.max(3000, p.at - performance.now())); }
     const dur = this.result?.duration ?? 20;
     const next = A.tickSchedule(this.schedule, dt, dur, this.game.rng);
     if (next === 'betting') this.openBetting();

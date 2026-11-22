@@ -42,7 +42,7 @@ export const SALON_TIMING = {
   emoteGap: 1200,
   salonTeaGap: 4000,
   /** çaya karşılık bu süre içinde gelirse kavga başlar */
-  retaliate: 10000,
+  retaliate: 20000,
   brawlDuration: 9000,
   /** maç gecesi: yarış bu kadar sonra başlar (bahis süresi) */
   raceLead: 20000,
