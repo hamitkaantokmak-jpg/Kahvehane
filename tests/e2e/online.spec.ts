@@ -1,7 +1,12 @@
-import { test, expect, Page } from '@playwright/test';
+import { test, expect, Page, Browser, BrowserContext } from '@playwright/test';
 import { trackErrors, W } from './helpers';
 
 const SERVER = 'http://localhost:8788';
+
+/** Testin açtığı tarayıcı bağlamları: test bitince kapatılır (açık kalırsa sonraki testleri yavaşlatır) */
+const contexts: BrowserContext[] = [];
+async function newPage(browser: Browser) { const c = await browser.newContext(); contexts.push(c); return c.newPage(); }
+test.afterEach(async () => { for (const c of contexts.splice(0)) await c.close().catch(() => {}); });
 
 // Bu dosyadaki testler sırayla, diğer tüm testlerden sonra koşar (her biri iki tarayıcı açar; yük altında kararsızlaşır)
 
@@ -24,27 +29,27 @@ async function stepIfMyTurn(page: Page) {
 
 test('Çevrimiçi: oda kur, davet bağlantısıyla katıl, batak oyna; laf ve çay öbür ekrana ulaşır', async ({ browser }) => {
   test.setTimeout(240_000);
-  const A = await (await browser.newContext()).newPage();
-  const B = await (await browser.newContext()).newPage();
+  const A = await newPage(browser);
+  const B = await newPage(browser);
   const errsA = trackErrors(A), errsB = trackErrors(B);
   // Ali oda kurar
   await bootAt(A, '');
   await A.evaluate(() => { const g = (window as unknown as W).__game; g.sitDown(g.kahve.tableById('kart2').seats[0]); });
   await A.locator('.online-entry button:has-text("Oda kur")').click();
   await A.locator('.online-panel .cr-name input').fill('Ali');
-  await A.locator('.online-panel button:has-text("Oda kur ▶")').click();
+  await A.locator('.online-panel button:has-text("Oda kur ▶")').click({ force: true });
   const code = (await A.locator('.room-code').first().textContent())!.trim();
   expect(code).toMatch(/^[A-Z]{4}$/);
   // Veli davet bağlantısıyla gelir
   await bootAt(B, `&oda=${code}`);
   await B.locator('.invite-modal button:has-text("Masaya otur")').click();
   await B.locator('.online-panel .cr-name input').fill('Veli');
-  await B.locator('.online-panel button:has-text("Katıl ▶")').click();
+  await B.locator('.online-panel button:has-text("Katıl ▶")').click({ force: true });
   await expect(B.locator('.oseat.me')).toContainText('Veli');
   await expect(A.locator('.online-seats')).toContainText('Veli');
   // yalnızca oda sahibi başlatır
   await expect(B.locator('.online-panel')).toContainText('Oda sahibinin başlatması bekleniyor');
-  await A.locator('.online-panel button:has-text("Başlat")').click();
+  await A.locator('.online-panel button:has-text("Başlat")').click({ force: true });
   await expect(A.locator('.trick-table')).toBeVisible();
   await expect(B.locator('.trick-table')).toBeVisible();
   // Veli'nin ekranında Ali kendi karakteriyle masada oturuyor
@@ -80,7 +85,7 @@ async function setupRoom(A: Page, B: Page, table: string) {
   await A.evaluate((t) => { const g = (window as unknown as W).__game; g.sitDown(g.kahve.tableById(t).seats[0]); }, table);
   await A.locator('.online-entry button:has-text("Oda kur")').click();
   await A.locator('.online-panel .cr-name input').fill('Ali');
-  await A.locator('.online-panel button:has-text("Oda kur ▶")').click();
+  await A.locator('.online-panel button:has-text("Oda kur ▶")').click({ force: true });
   const code = (await A.locator('.room-code').first().textContent())!.trim();
   await bootAt(B);
   await B.evaluate(() => { const g = (window as unknown as W).__game; g.sitDown(g.kahve.tableById('kart1').seats[0]); });
@@ -96,16 +101,16 @@ const ui = (p: Page, body: string) => p.evaluate((b) => new Function('ui', 's', 
 
 test('Çevrimiçi okey: okey masasında oda; kart masasından koda katılan okey masasına geçer; taş çek-at birlikte', async ({ browser }) => {
   test.setTimeout(200_000);
-  const A = await (await browser.newContext()).newPage();
-  const B = await (await browser.newContext()).newPage();
+  const A = await newPage(browser);
+  const B = await newPage(browser);
   const errs = [trackErrors(A), trackErrors(B)];
   await setupRoom(A, B, 'okey2');
   // Veli artık bir okey masasında
   expect(await B.evaluate(() => (window as unknown as W).__game.session.seat.table.kind)).toBe('okey');
   // oyun seçimi yalnızca okey ve 101
   await expect(A.locator('.online-games button')).toHaveCount(2);
-  await A.locator('.online-games button[data-game="okey"]').click();
-  await A.locator('.online-panel button:has-text("Başlat")').click();
+  await A.locator('.online-games button[data-game="okey"]').click({ force: true });
+  await A.locator('.online-panel button:has-text("Başlat")').click({ force: true });
   await expect(A.locator('.gui.okey')).toBeVisible();
   await expect(B.locator('.gui.okey')).toBeVisible();
   // Veli'nin ıstakası 14 ya da 15 taş, diğer eller kapalı
@@ -129,13 +134,13 @@ test('Çevrimiçi okey: okey masasında oda; kart masasından koda katılan okey
 
 test('Çevrimiçi tavla: iki kişilik oda; Veli tahtayı kendi tarafından görür; zar ve hamle karşıya ulaşır', async ({ browser }) => {
   test.setTimeout(200_000);
-  const A = await (await browser.newContext()).newPage();
-  const B = await (await browser.newContext()).newPage();
+  const A = await newPage(browser);
+  const B = await newPage(browser);
   const errs = [trackErrors(A), trackErrors(B)];
   await setupRoom(A, B, 'tavla2');
   expect(await B.evaluate(() => (window as unknown as W).__game.session.seat.table.kind)).toBe('tavla');
   await expect(A.locator('.oseat')).toHaveCount(2);
-  await A.locator('.online-panel button:has-text("Başlat")').click();
+  await A.locator('.online-panel button:has-text("Başlat")').click({ force: true });
   await expect(A.locator('.gui.tavla')).toBeVisible();
   await expect(B.locator('.gui.tavla')).toBeVisible();
   // ikisi de kendini beyaz ve başlangıç diziliminde görür
